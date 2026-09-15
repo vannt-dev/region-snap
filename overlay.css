@@ -1,0 +1,293 @@
+#region-snap-root,
+#region-snap-root * {
+  box-sizing: border-box !important;
+}
+
+#region-snap-root {
+  all: initial !important;
+  --rs-left: 0px;
+  --rs-top: 0px;
+  --rs-width: 0px;
+  --rs-height: 0px;
+  --rs-toolbar-left: 8px;
+  --rs-toolbar-top: 8px;
+  --rs-radius: 12px;
+  --rs-primary: #2563eb;
+  --rs-primary-hover: #1d4ed8;
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147483647 !important;
+  pointer-events: none !important;
+  contain: strict !important;
+  isolation: isolate !important;
+  font-family:
+    Inter,
+    ui-sans-serif,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif !important;
+  color: #f8fafc !important;
+}
+
+#region-snap-root[data-capturing="true"] {
+  display: block !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+#region-snap-root .region-snap-dim,
+#region-snap-root .region-snap-border {
+  display: none !important;
+  position: fixed !important;
+  left: 0 !important;
+  top: 0 !important;
+  width: var(--rs-width) !important;
+  height: var(--rs-height) !important;
+  transform: translate3d(var(--rs-left), var(--rs-top), 0) !important;
+  pointer-events: none !important;
+  will-change: transform, width, height !important;
+}
+
+#region-snap-root[data-has-rect="true"] .region-snap-dim,
+#region-snap-root[data-has-rect="true"] .region-snap-border {
+  display: block !important;
+}
+
+#region-snap-root .region-snap-dim {
+  border-radius: var(--rs-radius) !important;
+  box-shadow: 0 0 0 9999px rgba(8, 15, 28, 0.48) !important;
+}
+
+#region-snap-root[data-mode="hovering"] .region-snap-dim {
+  box-shadow: 0 0 0 9999px rgba(8, 15, 28, 0.28) !important;
+}
+
+#region-snap-root .region-snap-border {
+  border: 2px solid #60a5fa !important;
+  border-radius: var(--rs-radius) !important;
+  box-shadow:
+    0 0 0 1px rgba(15, 23, 42, 0.55),
+    0 0 18px rgba(59, 130, 246, 0.28) !important;
+}
+
+#region-snap-root[data-mode="hovering"] .region-snap-border {
+  border-style: dashed !important;
+  background: rgba(59, 130, 246, 0.045) !important;
+}
+
+#region-snap-root .region-snap-handle {
+  all: initial !important;
+  display: none !important;
+  position: fixed !important;
+  width: 22px !important;
+  height: 22px !important;
+  left: 0 !important;
+  top: 0 !important;
+  margin: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  pointer-events: auto !important;
+  will-change: transform !important;
+}
+
+#region-snap-root .region-snap-handle::after {
+  content: "" !important;
+  position: absolute !important;
+  inset: 5px !important;
+  background: var(--rs-primary) !important;
+  border: 2px solid #ffffff !important;
+  border-radius: 50% !important;
+  box-shadow: 0 2px 7px rgba(15, 23, 42, 0.42) !important;
+}
+
+#region-snap-root[data-mode="locked"] .region-snap-handle {
+  display: block !important;
+  animation: rs-handle-in 130ms ease-out !important;
+}
+
+#region-snap-root .region-snap-handle.nw,
+#region-snap-root .region-snap-handle.se {
+  cursor: nwse-resize !important;
+}
+#region-snap-root .region-snap-handle.ne,
+#region-snap-root .region-snap-handle.sw {
+  cursor: nesw-resize !important;
+}
+#region-snap-root .region-snap-handle.nw {
+  transform: translate3d(var(--rs-left), var(--rs-top), 0) translate(-50%, -50%) !important;
+}
+#region-snap-root .region-snap-handle.ne {
+  transform: translate3d(calc(var(--rs-left) + var(--rs-width)), var(--rs-top), 0)
+    translate(-50%, -50%) !important;
+}
+#region-snap-root .region-snap-handle.sw {
+  transform: translate3d(var(--rs-left), calc(var(--rs-top) + var(--rs-height)), 0)
+    translate(-50%, -50%) !important;
+}
+#region-snap-root .region-snap-handle.se {
+  transform: translate3d(
+      calc(var(--rs-left) + var(--rs-width)),
+      calc(var(--rs-top) + var(--rs-height)),
+      0
+    )
+    translate(-50%, -50%) !important;
+}
+
+#region-snap-root .region-snap-toolbar {
+  display: none !important;
+  position: fixed !important;
+  left: 0 !important;
+  top: 0 !important;
+  width: 224px !important;
+  min-height: 40px !important;
+  transform: translate3d(var(--rs-toolbar-left), var(--rs-toolbar-top), 0) !important;
+  align-items: center !important;
+  gap: 4px !important;
+  padding: 5px !important;
+  pointer-events: auto !important;
+  color: #f8fafc !important;
+  background: rgba(15, 23, 42, 0.96) !important;
+  border: 1px solid rgba(148, 163, 184, 0.28) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 10px 30px rgba(2, 6, 23, 0.38) !important;
+  will-change: transform !important;
+}
+
+#region-snap-root[data-mode="locked"] .region-snap-toolbar {
+  display: flex !important;
+  animation: rs-toolbar-in 150ms ease-out !important;
+}
+
+#region-snap-root .region-snap-toolbar button {
+  all: initial !important;
+  height: 28px !important;
+  padding: 0 10px !important;
+  border-radius: 7px !important;
+  font:
+    600 12px/28px Inter,
+    ui-sans-serif,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif !important;
+  text-align: center !important;
+  cursor: pointer !important;
+  user-select: none !important;
+}
+
+#region-snap-root .region-snap-toolbar button:focus-visible {
+  outline: 2px solid #93c5fd !important;
+  outline-offset: 2px !important;
+}
+
+#region-snap-root .region-snap-grip {
+  width: 28px !important;
+  padding: 0 !important;
+  color: #94a3b8 !important;
+  cursor: move !important;
+}
+
+#region-snap-root .region-snap-grip:hover {
+  background: #1e293b !important;
+}
+
+#region-snap-root .region-snap-size {
+  min-width: 70px !important;
+  color: #cbd5e1 !important;
+  font:
+    500 11px/1 ui-monospace,
+    SFMono-Regular,
+    Consolas,
+    monospace !important;
+  font-variant-numeric: tabular-nums !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+}
+
+#region-snap-root .region-snap-capture {
+  color: #ffffff !important;
+  background: var(--rs-primary) !important;
+}
+#region-snap-root .region-snap-capture:hover {
+  background: var(--rs-primary-hover) !important;
+}
+
+#region-snap-root .region-snap-cancel {
+  width: 28px !important;
+  padding: 0 !important;
+  color: #cbd5e1 !important;
+  background: transparent !important;
+  font-size: 18px !important;
+}
+#region-snap-root .region-snap-cancel:hover {
+  background: #334155 !important;
+}
+
+#region-snap-root .region-snap-toast {
+  position: fixed !important;
+  left: 50% !important;
+  bottom: 24px !important;
+  max-width: min(420px, calc(100vw - 32px)) !important;
+  padding: 9px 13px !important;
+  color: #f8fafc !important;
+  background: rgba(15, 23, 42, 0.94) !important;
+  border: 1px solid rgba(148, 163, 184, 0.3) !important;
+  border-radius: 9px !important;
+  box-shadow: 0 8px 24px rgba(2, 6, 23, 0.32) !important;
+  font:
+    500 12px/1.4 Inter,
+    ui-sans-serif,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif !important;
+  text-align: center !important;
+  opacity: 0 !important;
+  transform: translate(-50%, 8px) !important;
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease !important;
+}
+
+#region-snap-root .region-snap-toast.is-visible {
+  opacity: 1 !important;
+  transform: translate(-50%, 0) !important;
+}
+
+#region-snap-root[data-mode="dragging"] .region-snap-toast,
+#region-snap-root[data-interacting="true"] .region-snap-toast {
+  opacity: 0 !important;
+  transform: translate(-50%, 8px) !important;
+}
+
+@keyframes rs-toolbar-in {
+  from {
+    opacity: 0;
+    transform: translate3d(var(--rs-toolbar-left), calc(var(--rs-toolbar-top) + 4px), 0);
+  }
+}
+
+@keyframes rs-handle-in {
+  from {
+    opacity: 0;
+  }
+}
+
+#region-snap-root .region-snap-toast[data-kind="success"] {
+  border-color: rgba(74, 222, 128, 0.5) !important;
+}
+#region-snap-root .region-snap-toast[data-kind="error"] {
+  border-color: rgba(248, 113, 113, 0.6) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #region-snap-root .region-snap-toast {
+    transition: none !important;
+  }
+
+  #region-snap-root .region-snap-toolbar,
+  #region-snap-root .region-snap-handle {
+    animation: none !important;
+  }
+}

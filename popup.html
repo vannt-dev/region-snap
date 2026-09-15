@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Region Snap</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body class="is-loading">
+    <main>
+      <header class="brand">
+        <img class="brand__icon" src="icons/icon48.png" alt="" />
+        <div>
+          <h1>Region Snap</h1>
+          <p data-i18n="popupTagline">Capture the exact moment</p>
+        </div>
+      </header>
+
+      <section class="status-card" aria-live="polite">
+        <span class="status-dot" aria-hidden="true"></span>
+        <div>
+          <strong id="state-label" data-i18n="popupReady">Ready to select</strong>
+          <span id="state-detail" data-i18n="popupFlow">Select → interact → capture</span>
+        </div>
+      </section>
+
+      <div class="actions">
+        <button id="primary-action" class="button button--primary" type="button" disabled>
+          <span class="button__content">
+            <span class="button__spinner" aria-hidden="true"></span>
+            <span id="primary-label" data-i18n="popupSelect">Select a region</span>
+          </span>
+          <kbd id="primary-shortcut">Alt+Shift+S</kbd>
+        </button>
+        <button id="secondary-action" class="button button--ghost" type="button" hidden>
+          <span data-i18n="popupReselect">Select again</span>
+          <kbd id="secondary-shortcut">Alt+Shift+S</kbd>
+        </button>
+      </div>
+
+      <p id="error-message" class="error-message" role="alert" hidden></p>
+
+      <details class="help">
+        <summary data-i18n="popupHelpTitle">How it works</summary>
+        <ol>
+          <li data-i18n="popupHelpSelect">Click an element or drag a custom region.</li>
+          <li data-i18n="popupHelpInteract">Keep using the live page after the region locks.</li>
+          <li data-i18n="popupHelpCapture">
+            Capture from the overlay, popup, Enter, or the shortcut.
+          </li>
+        </ol>
+      </details>
+    </main>
+    <script src="shared.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,37 @@
+{
+  "name": "region-snap",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Interactive region screenshot Chrome extension",
+  "author": "vannt-dev",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vannt-dev/region-snap.git"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "check": "node --check background.js && node --check geometry.js && node --check content.js && node --check popup.js",
+    "ci": "npm run format:check && npm run lint && npm test && npm run build && npm run validate",
+    "clean": "node scripts/clean.mjs",
+    "docs:preview": "node scripts/serve-docs.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "package:store": "npm run build && node scripts/package-store.mjs",
+    "smoke": "node scripts/smoke.mjs",
+    "store:assets": "node scripts/generate-store-assets.mjs",
+    "test": "node tests/run-tests.js",
+    "validate": "node scripts/validate.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.0.1",
+    "globals": "^16.3.0",
+    "playwright": "^1.55.0",
+    "prettier": "^3.6.2"
+  }
+}

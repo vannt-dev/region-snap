@@ -1,0 +1,6 @@
+dist/
+release/
+node_modules/
+store-assets/**/*.png
+icons/**/*.png
+package-lock.json

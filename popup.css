@@ -1,0 +1,321 @@
+:root {
+  color-scheme: light;
+  --rs-primary: #2563eb;
+  --rs-primary-hover: #1d4ed8;
+  --rs-primary-soft: #dbeafe;
+  --rs-surface: #ffffff;
+  --rs-canvas: #f8fafc;
+  --rs-text: #0f172a;
+  --rs-muted: #64748b;
+  --rs-border: #e2e8f0;
+  --rs-danger: #b91c1c;
+  --rs-success: #16a34a;
+  --rs-radius: 12px;
+  --rs-glow: rgba(96, 165, 250, 0.18);
+  --rs-status-bg: rgba(255, 255, 255, 0.86);
+  --rs-ghost-text: #475569;
+  --rs-ghost-hover: #eef2f7;
+  --rs-locked-ring: #dcfce7;
+  --rs-unsupported-dot: #ef4444;
+  --rs-unsupported-ring: #fee2e2;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --rs-primary: #3b82f6;
+    --rs-primary-hover: #60a5fa;
+    --rs-primary-soft: rgba(59, 130, 246, 0.35);
+    --rs-surface: #1e293b;
+    --rs-canvas: #0f172a;
+    --rs-text: #f1f5f9;
+    --rs-muted: #94a3b8;
+    --rs-border: #334155;
+    --rs-danger: #f87171;
+    --rs-success: #4ade80;
+    --rs-glow: rgba(59, 130, 246, 0.22);
+    --rs-status-bg: rgba(30, 41, 59, 0.86);
+    --rs-ghost-text: #cbd5e1;
+    --rs-ghost-hover: #334155;
+    --rs-locked-ring: rgba(74, 222, 128, 0.28);
+    --rs-unsupported-dot: #f87171;
+    --rs-unsupported-ring: rgba(248, 113, 113, 0.28);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  width: 320px;
+  min-height: 286px;
+  margin: 0;
+  color: var(--rs-text);
+  background: radial-gradient(circle at 92% 0%, var(--rs-glow), transparent 32%), var(--rs-canvas);
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+main {
+  padding: 18px;
+  animation: popup-enter 150ms ease-out both;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 15px;
+}
+
+.brand__icon {
+  width: 40px;
+  height: 40px;
+  flex: none;
+}
+
+h1 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+}
+
+.brand p {
+  margin: 3px 0 0;
+  color: var(--rs-muted);
+  font-size: 11px;
+}
+
+.status-card {
+  display: flex;
+  min-height: 56px;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 11px;
+  padding: 10px 12px;
+  background: var(--rs-status-bg);
+  border: 1px solid var(--rs-border);
+  border-radius: var(--rs-radius);
+  box-shadow: 0 5px 16px rgba(15, 23, 42, 0.045);
+}
+
+.status-dot {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  background: var(--rs-primary);
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px var(--rs-primary-soft);
+}
+
+.status-card div {
+  min-width: 0;
+}
+
+.status-card strong,
+.status-card span:last-child {
+  display: block;
+}
+
+.status-card strong {
+  margin-bottom: 3px;
+  font-size: 12px;
+}
+
+.status-card span:last-child {
+  overflow: hidden;
+  color: var(--rs-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body[data-state="locked"] .status-dot {
+  background: var(--rs-success);
+  box-shadow: 0 0 0 4px var(--rs-locked-ring);
+}
+
+body[data-state="unsupported"] .status-dot {
+  background: var(--rs-unsupported-dot);
+  box-shadow: 0 0 0 4px var(--rs-unsupported-ring);
+}
+
+.actions {
+  display: grid;
+  gap: 7px;
+}
+
+.button {
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  font:
+    650 12px/1 Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    background-color 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.button:active:not(:disabled) {
+  transform: translateY(0) scale(0.99);
+}
+
+.button:focus-visible,
+.help summary:focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: 2px;
+}
+
+.button:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+
+.button--primary {
+  color: white;
+  background: var(--rs-primary);
+  box-shadow: 0 7px 16px rgba(37, 99, 235, 0.23);
+}
+
+.button--primary:hover:not(:disabled) {
+  background: var(--rs-primary-hover);
+  box-shadow: 0 9px 20px rgba(37, 99, 235, 0.28);
+}
+
+.button--ghost {
+  justify-content: center;
+  gap: 9px;
+  min-height: 38px;
+  color: var(--rs-ghost-text);
+  background: transparent;
+  border-color: transparent;
+}
+
+.button--ghost:hover:not(:disabled) {
+  color: var(--rs-text);
+  background: var(--rs-ghost-hover);
+}
+
+.button__content {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+#primary-label {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.button__spinner {
+  display: none;
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(255, 255, 255, 0.42);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 650ms linear infinite;
+}
+
+body.is-busy .button__spinner {
+  display: block;
+}
+
+kbd {
+  flex: none;
+  padding: 4px 6px;
+  color: inherit;
+  background: rgba(148, 163, 184, 0.16);
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 6px;
+  font:
+    500 9px/1 Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  opacity: 0.82;
+}
+
+.error-message {
+  margin: 9px 2px 0;
+  color: var(--rs-danger);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.help {
+  margin-top: 11px;
+  color: var(--rs-muted);
+  border-top: 1px solid var(--rs-border);
+}
+
+.help summary {
+  padding-top: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+
+.help ol {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.help li + li {
+  margin-top: 4px;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+@keyframes popup-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  main,
+  .button,
+  .button__spinner {
+    animation: none;
+    transition: none;
+  }
+}
