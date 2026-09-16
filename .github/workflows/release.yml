@@ -9,7 +9,8 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  extension:
+    name: Build Chrome Extension
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -26,17 +27,78 @@ jobs:
         run: node scripts/check-release-version.mjs
       - name: Run quality gate
         run: npm run ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run extension smoke test
+        run: npm run smoke
       - name: Build Store ZIP
         run: npm run package:store
-      - name: Create GitHub Release
-        if: github.ref_type == 'tag'
-        uses: softprops/action-gh-release@v2
-        with:
-          generate_release_notes: true
-          files: release/*.zip
-      - name: Upload workflow artifact
-        if: github.ref_type != 'tag'
+      - name: Upload Store package
         uses: actions/upload-artifact@v6
         with:
           name: region-snap-store-package
           path: release/*.zip
+
+  desktop:
+    name: Build Windows Desktop
+    runs-on: windows-latest
+    env:
+      CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Run desktop capture test
+        run: npm run desktop:test
+      - name: Require signing certificate for tagged releases
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:CSC_LINK)) {
+            throw "WINDOWS_CSC_LINK must be configured for tagged desktop releases."
+          }
+      - name: Build NSIS installer
+        run: npm run desktop:dist
+      - name: Verify Authenticode signatures
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        run: |
+          $targets = @(
+            "release\\win-unpacked\\Region Snap.exe",
+            (Get-ChildItem "release\\Region-Snap-Setup-*.exe").FullName
+          )
+          foreach ($target in $targets) {
+            $signature = Get-AuthenticodeSignature -LiteralPath $target
+            if ($signature.Status -ne "Valid") {
+              throw "$target is not signed with a valid Authenticode certificate."
+            }
+          }
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v6
+        with:
+          name: region-snap-windows-installer
+          path: release/Region-Snap-Setup-*.exe
+
+  release:
+    name: Publish GitHub Release
+    if: github.ref_type == 'tag'
+    needs: [extension, desktop]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v6
+        with:
+          path: release
+          merge-multiple: true
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: release/*

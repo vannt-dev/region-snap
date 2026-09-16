@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self'; script-src 'self'"
+    />
+    <title>Cài đặt Region Snap</title>
+    <link rel="stylesheet" href="settings.css" />
+  </head>
+  <body data-title-key="settingsTitle">
+    <main>
+      <header>
+        <img src="../icons/icon48.png" alt="" />
+        <div>
+          <h1>Region Snap</h1>
+          <p data-i18n="settingsSubtitle">Tùy chỉnh cách chụp và lưu ảnh.</p>
+        </div>
+      </header>
+      <form id="settings-form">
+        <label>
+          <span data-i18n="shortcutLabel">Phím tắt toàn hệ thống</span>
+          <input id="shortcut" name="shortcut" autocomplete="off" spellcheck="false" />
+          <small data-i18n="shortcutHelp">Ví dụ: Alt+Shift+S hoặc CommandOrControl+Shift+S</small>
+        </label>
+        <label>
+          <span data-i18n="outputLabel">Thư mục lưu ảnh</span>
+          <div class="directory-row">
+            <input id="output-directory" name="outputDirectory" readonly />
+            <button id="choose-directory" type="button" data-i18n="choose">Chọn…</button>
+          </div>
+          <small data-i18n="outputHelp">Để trống để dùng Pictures\Region Snap.</small>
+        </label>
+        <label class="check-row">
+          <input id="copy-to-clipboard" type="checkbox" />
+          <span data-i18n="clipboard">Tự động copy ảnh vào clipboard</span>
+        </label>
+        <label class="check-row">
+          <input id="open-at-login" type="checkbox" />
+          <span data-i18n="login">Khởi động cùng Windows</span>
+        </label>
+        <p id="login-note" class="note" hidden data-i18n="loginNote">
+          Tùy chọn khởi động cùng Windows có hiệu lực sau khi cài bản đóng gói.
+        </p>
+        <div class="actions">
+          <span id="status" role="status" aria-live="polite"></span>
+          <button class="primary" type="submit" data-i18n="save">Lưu cài đặt</button>
+        </div>
+      </form>
+    </main>
+    <script src="i18n.js"></script>
+    <script src="settings.js"></script>
+  </body>
+</html>

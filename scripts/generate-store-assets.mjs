@@ -31,7 +31,7 @@ function iconDataUrl() {
 await fs.mkdir(path.join(ROOT, "icons"), { recursive: true });
 await fs.mkdir(path.join(ROOT, "store-assets/screenshots"), { recursive: true });
 
-for (const size of [16, 32, 48, 128]) {
+for (const size of [16, 32, 48, 128, 256]) {
   await screenshotHtml(
     `<style>*{box-sizing:border-box}html,body,img{width:100%;height:100%;margin:0;display:block}</style><img src="${iconDataUrl()}">`,
     size,

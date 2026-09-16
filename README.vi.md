@@ -2,7 +2,7 @@
 
 _[Read in English](README.md)_
 
-Chrome Extension Manifest V3 để chọn một vùng trên trang, tiếp tục tương tác với nội dung thật và chụp đúng khoảnh khắc mong muốn.
+Region Snap là công cụ chụp vùng riêng tư cho Chrome và Windows. Extension có thể khóa vùng nội dung web đang chạy, còn ứng dụng desktop chụp xuyên nhiều màn hình với DPI khác nhau.
 
 ## Tính năng
 
@@ -16,6 +16,16 @@ Chrome Extension Manifest V3 để chọn một vùng trên trang, tiếp tục 
 - Xuất PNG bo góc 12 px với bốn góc trong suốt.
 - Giao diện mặc định bằng tiếng Anh; tự chuyển sang tiếng Việt theo ngôn ngữ Chrome.
 - Chỉ inject vào tab khi người dùng yêu cầu; extension không chạy thường trực trên mọi website.
+
+## Ứng dụng Windows desktop
+
+- Chạy trong system tray với phím tắt toàn hệ thống có thể cấu hình.
+- Chọn vùng xuyên nhiều màn hình và giữ đúng chất lượng khi mixed-DPI.
+- Ẩn overlay rồi lấy frame mới, phù hợp với video và nội dung động.
+- Lưu PNG cục bộ và có thể copy trực tiếp vào clipboard.
+- Hỗ trợ giao diện tiếng Việt/Anh, di chuyển–resize bằng bàn phím và tùy chọn khởi động cùng Windows.
+
+Dùng `npm run desktop:start` khi phát triển hoặc `npm run desktop:dist` để tạo bộ cài NSIS. Xem [`desktop/README.md`](desktop/README.md) để biết cách sử dụng, đóng gói và ký số.
 
 ## Cài đặt để phát triển
 
@@ -76,9 +86,13 @@ Chrome không cho extension inject vào một số trang nội bộ như `chrome
 npm run ci
 npm run smoke
 npm run package:store
+npm run desktop:test
+npm run desktop:dist
 ```
 
 File có thể upload trực tiếp lên Chrome Web Store được tạo tại `release/region-snap-interactive-screenshot-v<version>-store.zip`. Pipeline kiểm tra nội dung ZIP theo allowlist để test, source map, tài liệu nội bộ và dependency phát triển không lọt vào gói phát hành.
+
+Bộ cài Windows được tạo tại `release/Region-Snap-Setup-<version>.exe`. Release có tag bắt buộc dùng các secret Authenticode được hướng dẫn trong [`desktop/README.md`](desktop/README.md); workflow sẽ từ chối phát hành bộ cài chưa được ký số.
 
 ## Chrome Web Store
 

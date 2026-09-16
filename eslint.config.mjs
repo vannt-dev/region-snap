@@ -43,4 +43,20 @@ export default [
       globals: globals.node,
     },
   },
+  {
+    files: ["desktop/**/*.cjs"],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: "commonjs",
+      globals: globals.node,
+    },
+  },
+  {
+    files: ["desktop/**/*.js"],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: "script",
+      globals: globals.browser,
+    },
+  },
 ];

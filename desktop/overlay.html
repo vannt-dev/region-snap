@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'"
+    />
+    <title>Region Snap Desktop</title>
+    <link rel="stylesheet" href="overlay.css" />
+  </head>
+  <body data-title-key="capture">
+    <div id="selector" data-state="ready" data-has-selection="false">
+      <div class="shade top"></div>
+      <div class="shade left"></div>
+      <div class="shade right"></div>
+      <div class="shade bottom"></div>
+      <div class="selection-border"></div>
+      <button
+        class="handle nw"
+        data-handle="nw"
+        aria-label="Đổi kích thước góc trên trái"
+        data-i18n-aria-label="resizeNw"
+      ></button>
+      <button
+        class="handle ne"
+        data-handle="ne"
+        aria-label="Đổi kích thước góc trên phải"
+        data-i18n-aria-label="resizeNe"
+      ></button>
+      <button
+        class="handle sw"
+        data-handle="sw"
+        aria-label="Đổi kích thước góc dưới trái"
+        data-i18n-aria-label="resizeSw"
+      ></button>
+      <button
+        class="handle se"
+        data-handle="se"
+        aria-label="Đổi kích thước góc dưới phải"
+        data-i18n-aria-label="resizeSe"
+      ></button>
+      <div
+        class="toolbar"
+        role="toolbar"
+        aria-label="Công cụ chụp vùng"
+        data-i18n-aria-label="toolbar"
+      >
+        <button id="move" title="Kéo để di chuyển vùng" data-i18n-title="move">⠿</button>
+        <span id="size"></span>
+        <button id="capture" class="primary" data-i18n="capture">Chụp</button>
+        <button id="cancel" title="Hủy" data-i18n-title="cancel">×</button>
+      </div>
+      <div id="hint" data-i18n="hint">
+        Kéo chuột để chọn vùng · Có thể kéo xuyên nhiều màn hình · Esc để hủy
+      </div>
+      <div id="status" role="status" aria-live="polite"></div>
+    </div>
+    <script src="i18n.js"></script>
+    <script src="../geometry.js"></script>
+    <script src="overlay.js"></script>
+  </body>
+</html>

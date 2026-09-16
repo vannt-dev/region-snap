@@ -1,8 +1,10 @@
 {
   "name": "region-snap",
+  "productName": "Region Snap",
   "version": "1.0.0",
   "private": true,
-  "description": "Interactive region screenshot Chrome extension",
+  "description": "Region screenshot utility for Windows and Chrome",
+  "main": "desktop/main.cjs",
   "author": "vannt-dev",
   "license": "MIT",
   "repository": {
@@ -14,9 +16,13 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
-    "check": "node --check background.js && node --check geometry.js && node --check content.js && node --check popup.js",
-    "ci": "npm run format:check && npm run lint && npm test && npm run build && npm run validate",
+    "check": "node --check background.js && node --check geometry.js && node --check content.js && node --check popup.js && node --check desktop/capture-utils.cjs && node --check desktop/i18n.js && node --check desktop/main.cjs && node --check desktop/preload.cjs && node --check desktop/overlay.js && node --check desktop/settings-preload.cjs && node --check desktop/settings.js",
+    "ci": "npm run check && npm run format:check && npm run lint && npm test && npm run build && npm run validate",
     "clean": "node scripts/clean.mjs",
+    "desktop:start": "electron desktop/main.cjs",
+    "desktop:pack": "electron-builder --dir --win --x64",
+    "desktop:dist": "electron-builder --win nsis --x64",
+    "desktop:test": "node scripts/test-desktop.mjs",
     "docs:preview": "node scripts/serve-docs.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -27,11 +33,38 @@
     "test": "node tests/run-tests.js",
     "validate": "node scripts/validate.mjs"
   },
+  "build": {
+    "appId": "dev.vannt.region-snap.desktop",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "desktop/**/*",
+      "geometry.js",
+      "icons/**/*",
+      "package.json"
+    ],
+    "win": {
+      "icon": "icons/icon256.png",
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "Region Snap",
+      "artifactName": "Region-Snap-Setup-${version}.${ext}"
+    }
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "electron": "^44.4.1",
+    "electron-builder": "^26.15.3",
     "eslint": "^10.0.1",
-    "globals": "^16.3.0",
+    "globals": "^17.12.0",
     "playwright": "^1.55.0",
-    "prettier": "^3.6.2"
+    "prettier": "^3.9.7"
   }
 }

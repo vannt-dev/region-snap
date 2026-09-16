@@ -2,8 +2,8 @@
 
 _[Đọc bằng tiếng Việt](README.vi.md)_
 
-A Chrome Extension (Manifest V3) for selecting a region on a page, continuing to interact with the
-live content, and capturing exactly the moment you want.
+A private screenshot utility for Chrome and Windows. The Chrome extension can lock onto live page
+content, while the desktop app captures regions across multiple displays with mixed DPI.
 
 ## Features
 
@@ -18,6 +18,18 @@ live content, and capturing exactly the moment you want.
 - English UI by default; automatically switches to Vietnamese based on the Chrome language.
 - Only injects into a tab on explicit user request; the extension never runs persistently on every
   site.
+
+## Windows desktop app
+
+- Lives in the system tray with a configurable global shortcut.
+- Selects across multiple monitors and preserves mixed-DPI output quality.
+- Captures a fresh frame after hiding the overlay, suitable for video and other dynamic content.
+- Saves PNG files locally and can copy them directly to the clipboard.
+- Supports English and Vietnamese UI, keyboard movement/resizing, and optional startup with Windows.
+
+Run `npm run desktop:start` during development or `npm run desktop:dist` to create the NSIS
+installer. See [`desktop/README.md`](desktop/README.md) for desktop usage, packaging, and code-signing
+details.
 
 ## Development setup
 
@@ -85,12 +97,18 @@ Chrome Web Store, and some PDF/special tabs. For `file://` URLs, users may need 
 npm run ci
 npm run smoke
 npm run package:store
+npm run desktop:test
+npm run desktop:dist
 ```
 
 A file ready to upload to the Chrome Web Store is produced at
 `release/region-snap-interactive-screenshot-v<version>-store.zip`. The pipeline verifies the ZIP
 contents against an allowlist so tests, source maps, internal docs, and dev dependencies never leak
 into the release package.
+
+The Windows installer is produced at `release/Region-Snap-Setup-<version>.exe`. Tagged releases
+require the Authenticode secrets documented in [`desktop/README.md`](desktop/README.md), and the
+release workflow refuses to publish an unsigned installer.
 
 ## Chrome Web Store
 
