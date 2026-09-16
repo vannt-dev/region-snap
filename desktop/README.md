@@ -45,4 +45,4 @@ Tagged GitHub releases require an Authenticode certificate. Configure these repo
 - `WINDOWS_CSC_LINK`: a base64-encoded `.pfx` certificate or a certificate URL supported by electron-builder
 - `WINDOWS_CSC_KEY_PASSWORD`: the certificate password
 
-The release workflow builds the Chrome Web Store ZIP and Windows NSIS installer separately, verifies both the packaged executable and installer signatures, and publishes them together. A tagged release fails instead of publishing an unsigned installer. Manual workflow runs may still produce unsigned test artifacts.
+The release workflow builds the Chrome Web Store ZIP and Windows NSIS installer separately. When signing secrets are available, it verifies both the packaged executable and installer signatures before publishing them. Without a certificate, the Chrome package is released first and the unsigned Windows installer is omitted; rerunning the workflow after configuring the secrets attaches the signed installer to the same release. Manual workflow runs may still produce unsigned test artifacts.

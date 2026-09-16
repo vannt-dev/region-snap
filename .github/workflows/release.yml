@@ -42,6 +42,8 @@ jobs:
   desktop:
     name: Build Windows Desktop
     runs-on: windows-latest
+    outputs:
+      signed: ${{ steps.signing.outputs.enabled }}
     env:
       CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
       CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
@@ -57,17 +59,26 @@ jobs:
         run: npm ci
       - name: Run desktop capture test
         run: npm run desktop:test
-      - name: Require signing certificate for tagged releases
-        if: github.ref_type == 'tag'
+      - name: Check signing availability
+        id: signing
         shell: pwsh
         run: |
           if ([string]::IsNullOrWhiteSpace($env:CSC_LINK)) {
-            throw "WINDOWS_CSC_LINK must be configured for tagged desktop releases."
+            "enabled=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          } else {
+            "enabled=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           }
+      - name: Note deferred Windows installer
+        if: github.ref_type == 'tag' && steps.signing.outputs.enabled != 'true'
+        shell: pwsh
+        run: |
+          "### Windows installer deferred" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          "Configure WINDOWS_CSC_LINK and WINDOWS_CSC_KEY_PASSWORD, then rerun this workflow to attach the signed installer." | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
       - name: Build NSIS installer
+        if: github.ref_type != 'tag' || steps.signing.outputs.enabled == 'true'
         run: npm run desktop:dist
       - name: Verify Authenticode signatures
-        if: github.ref_type == 'tag'
+        if: github.ref_type == 'tag' && steps.signing.outputs.enabled == 'true'
         shell: pwsh
         run: |
           $targets = @(
@@ -81,6 +92,7 @@ jobs:
             }
           }
       - name: Upload Windows installer
+        if: github.ref_type != 'tag' || steps.signing.outputs.enabled == 'true'
         uses: actions/upload-artifact@v6
         with:
           name: region-snap-windows-installer
@@ -101,4 +113,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+          body: ${{ needs.desktop.outputs.signed == 'true' && 'Includes the Chrome extension package and signed Windows installer.' || 'The Chrome extension package is available now. The signed Windows installer will be attached after the code-signing certificate is configured.' }}
           files: release/*

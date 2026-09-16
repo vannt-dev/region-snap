@@ -107,8 +107,8 @@ contents against an allowlist so tests, source maps, internal docs, and dev depe
 into the release package.
 
 The Windows installer is produced at `release/Region-Snap-Setup-<version>.exe`. Tagged releases
-require the Authenticode secrets documented in [`desktop/README.md`](desktop/README.md), and the
-release workflow refuses to publish an unsigned installer.
+publish it only when the Authenticode secrets documented in [`desktop/README.md`](desktop/README.md)
+are configured; otherwise the Chrome package is released first and the unsigned installer is omitted.
 
 ## Chrome Web Store
 

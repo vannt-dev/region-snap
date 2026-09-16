@@ -92,7 +92,7 @@ npm run desktop:dist
 
 File có thể upload trực tiếp lên Chrome Web Store được tạo tại `release/region-snap-interactive-screenshot-v<version>-store.zip`. Pipeline kiểm tra nội dung ZIP theo allowlist để test, source map, tài liệu nội bộ và dependency phát triển không lọt vào gói phát hành.
 
-Bộ cài Windows được tạo tại `release/Region-Snap-Setup-<version>.exe`. Release có tag bắt buộc dùng các secret Authenticode được hướng dẫn trong [`desktop/README.md`](desktop/README.md); workflow sẽ từ chối phát hành bộ cài chưa được ký số.
+Bộ cài Windows được tạo tại `release/Region-Snap-Setup-<version>.exe`. Release có tag chỉ phát hành bộ cài khi đã cấu hình các secret Authenticode được hướng dẫn trong [`desktop/README.md`](desktop/README.md); nếu chưa có, gói Chrome sẽ được phát hành trước và installer unsigned bị loại bỏ.
 
 ## Chrome Web Store
 
