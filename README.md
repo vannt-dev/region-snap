@@ -1,5 +1,7 @@
 # Region Snap
 
+[![Downloads](https://img.shields.io/github/downloads/vannt-dev/region-snap/total)](https://github.com/vannt-dev/region-snap/releases)
+
 _[Đọc bằng tiếng Việt](README.vi.md)_
 
 A private screenshot utility for Chrome and Windows. The Chrome extension can lock onto live page
