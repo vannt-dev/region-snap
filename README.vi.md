@@ -1,6 +1,7 @@
 # Region Snap
 
 [![Downloads](https://img.shields.io/github/downloads/vannt-dev/region-snap/total)](https://github.com/vannt-dev/region-snap/releases)
+[![Chrome Web Store](https://img.shields.io/chrome-web-store/v/gdcpiocagphfbomdokhfomjnecnjfcon?label=Chrome%20Web%20Store&logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/region-snap-interactive-s/gdcpiocagphfbomdokhfomjnecnjfcon)
 
 _[Read in English](README.md)_
 
@@ -28,6 +29,11 @@ Region Snap là công cụ chụp vùng riêng tư cho Chrome và Windows. Exten
 - Hỗ trợ giao diện tiếng Việt/Anh, di chuyển–resize bằng bàn phím và tùy chọn khởi động cùng Windows.
 
 Dùng `npm run desktop:start` khi phát triển hoặc `npm run desktop:dist` để tạo bộ cài NSIS. Xem [`desktop/README.md`](desktop/README.md) để biết cách sử dụng, đóng gói và ký số.
+
+## Cài đặt
+
+Cài Region Snap từ [Chrome Web Store](https://chromewebstore.google.com/detail/region-snap-interactive-s/gdcpiocagphfbomdokhfomjnecnjfcon). Tiện ích cũng chạy được trên Microsoft Edge và các
+trình duyệt Chromium khác cho phép cài tiện ích từ Chrome Web Store.
 
 ## Cài đặt để phát triển
 

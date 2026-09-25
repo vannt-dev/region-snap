@@ -1,6 +1,7 @@
 # Region Snap
 
 [![Downloads](https://img.shields.io/github/downloads/vannt-dev/region-snap/total)](https://github.com/vannt-dev/region-snap/releases)
+[![Chrome Web Store](https://img.shields.io/chrome-web-store/v/gdcpiocagphfbomdokhfomjnecnjfcon?label=Chrome%20Web%20Store&logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/region-snap-interactive-s/gdcpiocagphfbomdokhfomjnecnjfcon)
 
 _[Đọc bằng tiếng Việt](README.vi.md)_
 
@@ -32,6 +33,11 @@ content, while the desktop app captures regions across multiple displays with mi
 Run `npm run desktop:start` during development or `npm run desktop:dist` to create the NSIS
 installer. See [`desktop/README.md`](desktop/README.md) for desktop usage, packaging, and code-signing
 details.
+
+## Install
+
+Install Region Snap from the [Chrome Web Store](https://chromewebstore.google.com/detail/region-snap-interactive-s/gdcpiocagphfbomdokhfomjnecnjfcon). It also works in Microsoft Edge and other
+Chromium browsers that accept Chrome Web Store extensions.
 
 ## Development setup
 
