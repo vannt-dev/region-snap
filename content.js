@@ -12,8 +12,9 @@
     return;
   }
 
-  const { MESSAGE, STATE } = Shared;
+  const { IMAGE_FORMATS, MESSAGE, SETTINGS_KEY, STATE, buildFileName, normalizeSettings } = Shared;
   const MIN_SIZE = 8;
+  const LOSSY_QUALITY = 0.92;
   const t = (key) => chrome.i18n.getMessage(key) || key;
 
   let state = STATE.IDLE;
@@ -115,10 +116,10 @@
 
     document.documentElement.appendChild(root);
     toolbar.querySelector(".region-snap-capture").addEventListener("click", (event) => {
-      if (event.isTrusted) doCapture();
+      if (event.isTrusted) doCapture({ action: "download" });
     });
     toolbar.querySelector(".region-snap-copy").addEventListener("click", (event) => {
-      if (event.isTrusted) doCapture({ copy: true });
+      if (event.isTrusted) doCapture({ action: "copy" });
     });
     toolbar.querySelector(".region-snap-cancel").addEventListener("click", (event) => {
       if (event.isTrusted) reset();
@@ -508,13 +509,28 @@
     return loaded;
   }
 
-  function canvasToBlob(canvas) {
+  function canvasToBlob(canvas, mime) {
     return new Promise((resolve, reject) => {
-      canvas.toBlob((blob) => {
-        if (blob) resolve(blob);
-        else reject(new Error(t("overlayPngError")));
-      }, "image/png");
+      canvas.toBlob(
+        (blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error(t("overlayPngError")));
+        },
+        mime,
+        LOSSY_QUALITY,
+      );
     });
+  }
+
+  // Read on every capture so a change made on the options page applies without reselecting.
+  // Pages where the storage API is unavailable capture with the defaults.
+  async function loadSettings() {
+    try {
+      const stored = await chrome.storage.local.get(SETTINGS_KEY);
+      return normalizeSettings(stored?.[SETTINGS_KEY]);
+    } catch {
+      return normalizeSettings(null);
+    }
   }
 
   function clipRoundedRect(context, width, height, radius) {
@@ -533,21 +549,11 @@
     context.clip();
   }
 
-  function downloadBlob(blob) {
-    const now = new Date();
-    const stamp = [
-      now.getFullYear(),
-      String(now.getMonth() + 1).padStart(2, "0"),
-      String(now.getDate()).padStart(2, "0"),
-      "-",
-      String(now.getHours()).padStart(2, "0"),
-      String(now.getMinutes()).padStart(2, "0"),
-      String(now.getSeconds()).padStart(2, "0"),
-    ].join("");
+  function downloadBlob(blob, settings) {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `region-snap-${stamp}.png`;
+    anchor.download = buildFileName(settings, new Date());
     anchor.style.display = "none";
     anchor.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
@@ -566,7 +572,7 @@
     }
   }
 
-  async function cropToBlob(dataUrl, selectedRect) {
+  async function cropToBlob(dataUrl, selectedRect, settings) {
     if (!dataUrl?.startsWith("data:image/")) throw new Error(t("overlayInvalidImage"));
     const image = await loadImage(dataUrl);
     const metrics = Geometry.getCropMetrics(selectedRect, viewportBounds(), {
@@ -584,7 +590,15 @@
       image.naturalWidth / window.innerWidth,
       image.naturalHeight / window.innerHeight,
     );
-    clipRoundedRect(context, canvas.width, canvas.height, CORNER_RADIUS * cornerScale);
+    const { mime } = IMAGE_FORMATS[settings.format];
+    // JPEG has no transparency: without a backdrop the cut corners would come out black.
+    if (mime === "image/jpeg") {
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    if (settings.roundedCorners) {
+      clipRoundedRect(context, canvas.width, canvas.height, CORNER_RADIUS * cornerScale);
+    }
 
     context.drawImage(
       image,
@@ -598,7 +612,7 @@
       canvas.height,
     );
     try {
-      return await canvasToBlob(canvas);
+      return await canvasToBlob(canvas, mime);
     } finally {
       canvas.width = 1;
       canvas.height = 1;
@@ -606,7 +620,8 @@
     }
   }
 
-  async function doCapture({ copy = false } = {}) {
+  // `action` is "download" or "copy"; left out, the user's default action applies.
+  async function doCapture({ action } = {}) {
     if (state !== STATE.LOCKED || !rect) {
       showToast(t("overlaySelectFirst"), "error");
       return false;
@@ -627,14 +642,19 @@
         throw new Error(response?.error || t("overlayCaptureMissing"));
       }
       if (captureSession !== sessionId) return false;
-      const blob = await cropToBlob(response.dataUrl, selectedRect);
+      const stored = await loadSettings();
+      if (captureSession !== sessionId) return false;
+      const copy = (action || stored.defaultAction) === "copy";
+      // The clipboard only takes PNG, so a copy ignores the chosen file format.
+      const settings = copy ? { ...stored, format: "png" } : stored;
+      const blob = await cropToBlob(response.dataUrl, selectedRect, settings);
       if (captureSession !== sessionId) return false;
       let message = t("overlaySaved");
       if (copy && (await copyBlob(blob))) {
         message = t("overlayCopied");
       } else {
         if (copy) message = t("overlayCopyFallback");
-        downloadBlob(blob);
+        downloadBlob(blob, settings);
       }
       if (root && captureSession === sessionId) {
         root.dataset.capturing = "false";

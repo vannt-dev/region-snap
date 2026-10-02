@@ -42,9 +42,16 @@
         </li>
         <li>
           A screenshot is held in memory only long enough to crop the selected region and create the
-          PNG requested by the user.
+          image requested by the user.
         </li>
-        <li>The resulting PNG is downloaded directly to the user's device.</li>
+        <li>
+          The resulting image is downloaded directly to the user's device, or placed on the
+          clipboard when the user chooses to copy it.
+        </li>
+        <li>
+          Region Snap stores four preferences on the device (image format, rounded corners, file
+          name prefix, default action). They never leave the device.
+        </li>
       </ul>
 
       <h2>Permission usage</h2>
@@ -56,6 +63,10 @@
       <p>
         <code>scripting</code> injects the region-selection interface into the active tab only after
         an explicit user action.
+      </p>
+      <p>
+        <code>storage</code> keeps the preferences listed above in the browser's local extension
+        storage.
       </p>
 
       <h2>Remote services</h2>

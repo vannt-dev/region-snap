@@ -16,6 +16,8 @@ Region Snap là công cụ chụp vùng riêng tư cho Chrome và Windows. Exten
 - Chụp bằng toolbar, phím `Enter` hoặc `Alt+Shift+C`.
 - Nút **Sao chép** đưa PNG vào clipboard thay vì tải về; trang không dùng được clipboard (ví dụ
   `http://` thường) sẽ tự chuyển sang tải file.
+- Trang cài đặt (popup → **Cài đặt**) cho chọn định dạng ảnh (PNG, JPEG hoặc WebP), tắt bo góc, đặt
+  tiền tố tên tệp, và đổi phím `Enter` cùng phím tắt sang sao chép thay vì tải về.
 - Khi nút di chuyển `⠿` đang được focus, dùng phím mũi tên để tinh chỉnh; giữ `Shift` để di chuyển 10 px.
 - Crop theo kích thước ảnh thật để hoạt động đúng với zoom và scale màn hình.
 - Xuất PNG bo góc 12 px với bốn góc trong suốt.
@@ -69,6 +71,7 @@ Có thể thay đổi phím tắt tại `chrome://extensions/shortcuts`.
 
 - `activeTab`: chỉ truy cập tab hiện tại sau hành động trực tiếp của người dùng.
 - `scripting`: inject giao diện chọn vùng vào tab đang được kích hoạt.
+- `storage`: lưu bốn cài đặt trên chính thiết bị này. Không lưu gì khác.
 
 Extension xử lý ảnh ngay trong trình duyệt và không gửi ảnh ra máy chủ.
 

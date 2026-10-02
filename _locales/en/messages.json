@@ -33,13 +33,13 @@
   "overlayLockedHint": { "message": "Region locked — keep interacting with the page" },
   "overlaySelectFirst": { "message": "Select and lock a region first" },
   "overlayImageReadError": { "message": "Chrome returned an unreadable screenshot." },
-  "overlayPngError": { "message": "Could not create the PNG file." },
+  "overlayPngError": { "message": "Could not create the image file." },
   "overlayInvalidImage": { "message": "Chrome returned an invalid image." },
   "overlayCanvasError": { "message": "Canvas image processing is unavailable." },
   "overlayCaptureMissing": { "message": "Chrome did not return a screenshot." },
-  "overlaySaved": { "message": "PNG saved" },
+  "overlaySaved": { "message": "Image saved" },
   "overlayCopied": { "message": "Copied to clipboard" },
-  "overlayCopyFallback": { "message": "This page blocks the clipboard — PNG saved instead" },
+  "overlayCopyFallback": { "message": "This page blocks the clipboard — image saved instead" },
   "overlayCaptureError": { "message": "Screenshot failed" },
   "errorUnknown": { "message": "Unknown error" },
   "errorRestricted": { "message": "Chrome does not allow Region Snap to run on this page." },
@@ -50,5 +50,25 @@
   "errorInvalidCommand": { "message": "Invalid command." },
   "errorUnknownCaptureTab": { "message": "Could not identify the tab to capture." },
   "errorTabChanged": { "message": "The active tab changed before the screenshot was captured." },
-  "errorNoLockedRegion": { "message": "No region is locked on this tab." }
+  "errorNoLockedRegion": { "message": "No region is locked on this tab." },
+  "popupSettings": { "message": "Settings" },
+  "optionsTitle": { "message": "Region Snap settings" },
+  "optionsFormat": { "message": "Image format" },
+  "optionsFormatHint": {
+    "message": "Copying to the clipboard always uses PNG. JPEG has no transparency, so cut corners are white."
+  },
+  "optionsCorners": { "message": "Corners" },
+  "optionsCornersLabel": { "message": "Round the corners (12 px)" },
+  "optionsAction": { "message": "Default action" },
+  "optionsActionDownload": { "message": "Download the image" },
+  "optionsActionCopy": { "message": "Copy to the clipboard" },
+  "optionsActionHint": {
+    "message": "Used by Enter, the keyboard shortcut and the popup. The toolbar buttons always do what they say."
+  },
+  "optionsFileName": { "message": "File name" },
+  "optionsFileNameLabel": { "message": "Prefix" },
+  "optionsFileNameExample": { "message": "Example:" },
+  "optionsReset": { "message": "Restore defaults" },
+  "optionsSaved": { "message": "Saved" },
+  "optionsSaveError": { "message": "Could not save the settings" }
 }

@@ -11,13 +11,15 @@ Region Snap captures a user-selected portion of the currently visible browser ta
 - Region Snap does not collect, transmit, sell, or share personal information.
 - Region Snap does not use analytics, advertising, telemetry, or tracking scripts.
 - Region Snap does not store browsing history, page URLs, page content, screenshots, or form data.
-- A screenshot is held in memory only long enough to crop the selected region and create the PNG requested by the user.
-- The resulting PNG is downloaded directly to the user's device.
+- A screenshot is held in memory only long enough to crop the selected region and create the image requested by the user.
+- The resulting image is downloaded directly to the user's device, or placed on the clipboard when the user chooses to copy it.
+- Region Snap stores four preferences on the device (image format, rounded corners, file name prefix, default action). They never leave the device.
 
 ## Permission usage
 
 - `activeTab` gives temporary access to the current tab only after the user clicks the extension or invokes its keyboard shortcut. It is required to capture the visible tab selected by the user.
 - `scripting` injects the region-selection interface into the active tab only after an explicit user action.
+- `storage` keeps the preferences listed above in the browser's local extension storage.
 
 ## Remote services
 

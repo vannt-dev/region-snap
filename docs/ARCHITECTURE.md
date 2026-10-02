@@ -6,7 +6,9 @@ framework or bundler, which keeps the Store package small and makes its contents
 ## Runtime boundaries
 
 - `shared.js` is the communication contract. Add message names, selection states, command mappings,
-  and default shortcuts here before using them in another context.
+  and default shortcuts here before using them in another context. It also owns the settings
+  contract: the defaults, `normalizeSettings` and `buildFileName`. Every reader of stored settings
+  goes through `normalizeSettings`.
 - `background.js` owns Chrome-only operations: active-tab validation, on-demand injection, command
   routing, and visible-tab capture.
 - `geometry.js` contains pure rectangle and crop calculations. Keep DOM and Chrome APIs out of this
@@ -15,6 +17,8 @@ framework or bundler, which keeps the Store package small and makes its contents
   controller must remove every listener it creates when `destroy()` is called.
 - `popup.js` only renders current state and sends commands. It does not inject scripts or capture tabs
   directly.
+- `options.js` is the only writer of `chrome.storage.local`. `content.js` reads the settings at
+  capture time and falls back to the defaults when storage is unavailable.
 - `overlay.css` and `popup.css` contain their respective visual systems. Shared visual values use the
   `--rs-*` naming convention.
 

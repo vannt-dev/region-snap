@@ -42,6 +42,8 @@ Region Snap's single purpose is to let users select and save a precise region of
 
 **`scripting`:** Required to inject the region-selection overlay into the active tab after an explicit user action. The extension does not inject into every page at load time.
 
+**`storage`:** Required to remember the user's four preferences (image format, rounded corners, file name prefix, default action) in `chrome.storage.local` on the device. No page content, URL or screenshot is stored.
+
 ### Data-use disclosure
 
 The extension handles website content only to create the screenshot requested by the user. Screenshot pixels are processed temporarily in local browser memory, are not stored by the extension, and are never transmitted to the developer or a third party. No data is collected or sold.

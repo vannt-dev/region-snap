@@ -47,7 +47,7 @@ async function validateRuntime(baseDir) {
   const manifest = await readJson(path.join(baseDir, "manifest.json"));
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.default_locale, "en", "English must remain the primary locale");
-  assert.deepEqual([...manifest.permissions].sort(), ["activeTab", "scripting"]);
+  assert.deepEqual([...manifest.permissions].sort(), ["activeTab", "scripting", "storage"]);
   assert.equal(manifest.content_scripts, undefined, "content scripts must remain on-demand");
 
   const localesDirectory = path.join(baseDir, "_locales");
@@ -72,6 +72,7 @@ async function validateRuntime(baseDir) {
   const referenced = [
     manifest.background.service_worker,
     manifest.action.default_popup,
+    manifest.options_ui.page,
     ...Object.values(manifest.icons || {}),
     ...Object.values(manifest.action.default_icon || {}),
   ];

@@ -40,7 +40,9 @@ test("replaced content controllers release their runtime listener", () => {
 });
 
 test("page-generated input cannot trigger capture controls or observe download URLs", () => {
-  assert.match(contentSource, /if \(event\.isTrusted\) doCapture\(\)/);
+  assert.match(contentSource, /if \(event\.isTrusted\) doCapture\(\{ action: "download" \}\)/);
+  assert.match(contentSource, /if \(event\.isTrusted\) doCapture\(\{ action: "copy" \}\)/);
+  assert.doesNotMatch(contentSource, /addEventListener\("click", \(\) =>/);
   assert.doesNotMatch(contentSource, /appendChild\(anchor\)/);
 });
 

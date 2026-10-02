@@ -125,6 +125,9 @@ async function loadStatus() {
 
 primaryButton.addEventListener("click", () => runCommand(primaryCommand));
 secondaryButton.addEventListener("click", () => runCommand(MESSAGE.START_PICKING));
+document.getElementById("open-settings").addEventListener("click", () => {
+  chrome.runtime.openOptionsPage();
+});
 
 localizeDocument();
 Promise.all([loadShortcuts(), loadStatus()]);
