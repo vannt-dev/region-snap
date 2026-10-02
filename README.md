@@ -15,6 +15,8 @@ content, while the desktop app captures regions across multiple displays with mi
 - Move and resize a locked region.
 - The page underneath stays fully interactive after the region locks.
 - Capture from the toolbar, `Enter`, or `Alt+Shift+C`.
+- **Copy** puts the PNG on the clipboard instead of downloading it; pages where the clipboard is
+  unavailable (plain `http://`, for example) get the download as a fallback.
 - While a move handle `⠿` is focused, use arrow keys to nudge it; hold `Shift` to move 10 px.
 - Crops against the real screenshot dimensions so zoom and display scaling stay accurate.
 - Exports a PNG with 12 px rounded corners and four transparent corners.
