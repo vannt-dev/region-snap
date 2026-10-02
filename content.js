@@ -45,7 +45,7 @@
   let toast;
   const handles = {};
 
-  const TOOLBAR_WIDTH = 224;
+  const TOOLBAR_WIDTH = 300;
   const TOOLBAR_HEIGHT = 40;
   const CORNER_RADIUS = 12;
 
@@ -91,6 +91,7 @@
       <button class="region-snap-grip" type="button" title="${t("overlayMove")}" aria-label="${t("overlayMove")}">⠿</button>
       <span class="region-snap-size" aria-live="polite"></span>
       <button class="region-snap-capture" type="button">${t("overlayCapture")}</button>
+      <button class="region-snap-copy" type="button">${t("overlayCopy")}</button>
       <button class="region-snap-cancel" type="button" title="${t("overlayCancel")}" aria-label="${t("overlayCancel")}">×</button>
     `;
     gripButton = toolbar.querySelector(".region-snap-grip");
@@ -115,6 +116,9 @@
     document.documentElement.appendChild(root);
     toolbar.querySelector(".region-snap-capture").addEventListener("click", (event) => {
       if (event.isTrusted) doCapture();
+    });
+    toolbar.querySelector(".region-snap-copy").addEventListener("click", (event) => {
+      if (event.isTrusted) doCapture({ copy: true });
     });
     toolbar.querySelector(".region-snap-cancel").addEventListener("click", (event) => {
       if (event.isTrusted) reset();
@@ -549,6 +553,19 @@
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
+  // The async clipboard API only exists in secure contexts and rejects when the page is not
+  // focused or blocks it by policy; the caller falls back to a download in those cases.
+  async function copyBlob(blob) {
+    if (!navigator.clipboard?.write || typeof ClipboardItem !== "function") return false;
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      return true;
+    } catch (error) {
+      console.warn("Region Snap clipboard write failed:", error);
+      return false;
+    }
+  }
+
   async function cropToBlob(dataUrl, selectedRect) {
     if (!dataUrl?.startsWith("data:image/")) throw new Error(t("overlayInvalidImage"));
     const image = await loadImage(dataUrl);
@@ -589,7 +606,7 @@
     }
   }
 
-  async function doCapture() {
+  async function doCapture({ copy = false } = {}) {
     if (state !== STATE.LOCKED || !rect) {
       showToast(t("overlaySelectFirst"), "error");
       return false;
@@ -612,10 +629,16 @@
       if (captureSession !== sessionId) return false;
       const blob = await cropToBlob(response.dataUrl, selectedRect);
       if (captureSession !== sessionId) return false;
-      downloadBlob(blob);
+      let message = t("overlaySaved");
+      if (copy && (await copyBlob(blob))) {
+        message = t("overlayCopied");
+      } else {
+        if (copy) message = t("overlayCopyFallback");
+        downloadBlob(blob);
+      }
       if (root && captureSession === sessionId) {
         root.dataset.capturing = "false";
-        showToast(t("overlaySaved"), "success");
+        showToast(message, "success");
       }
       return true;
     } catch (error) {

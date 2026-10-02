@@ -213,6 +213,14 @@
   background: var(--rs-primary-hover) !important;
 }
 
+#region-snap-root .region-snap-copy {
+  color: #e2e8f0 !important;
+  background: #1e293b !important;
+}
+#region-snap-root .region-snap-copy:hover {
+  background: #334155 !important;
+}
+
 #region-snap-root .region-snap-cancel {
   width: 28px !important;
   padding: 0 !important;

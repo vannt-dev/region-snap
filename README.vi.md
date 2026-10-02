@@ -11,6 +11,8 @@ Region Snap là công cụ chụp vùng riêng tư cho Chrome và Windows. Exten
 - Di chuyển và đổi kích thước vùng đã khóa.
 - Trang bên dưới vẫn tương tác bình thường sau khi khóa vùng.
 - Chụp bằng toolbar, phím `Enter` hoặc `Alt+Shift+C`.
+- Nút **Sao chép** đưa PNG vào clipboard thay vì tải về; trang không dùng được clipboard (ví dụ
+  `http://` thường) sẽ tự chuyển sang tải file.
 - Khi nút di chuyển `⠿` đang được focus, dùng phím mũi tên để tinh chỉnh; giữ `Shift` để di chuyển 10 px.
 - Crop theo kích thước ảnh thật để hoạt động đúng với zoom và scale màn hình.
 - Xuất PNG bo góc 12 px với bốn góc trong suốt.

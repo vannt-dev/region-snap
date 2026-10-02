@@ -157,6 +157,17 @@ try {
   const signature = (await fs.readFile(downloadPath)).subarray(0, 8).toString("hex");
   assert.equal(signature, "89504e470d0a1a0a");
 
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  const downloadsBeforeCopy = downloadCount;
+  await targetPage.locator(".region-snap-copy").click();
+  await targetPage.locator(".region-snap-toast", { hasText: "overlayCopied" }).waitFor();
+  const clipboardTypes = await targetPage.evaluate(async () => {
+    const items = await globalThis.navigator.clipboard.read();
+    return items.flatMap((item) => item.types);
+  });
+  assert.deepEqual(clipboardTypes, ["image/png"]);
+  assert.equal(downloadCount, downloadsBeforeCopy, "a successful copy must not also download");
+
   const page = await context.newPage();
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
