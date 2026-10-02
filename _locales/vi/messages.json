@@ -33,13 +33,13 @@
   "overlayLockedHint": { "message": "Đã khóa vùng — bạn có thể tiếp tục tương tác" },
   "overlaySelectFirst": { "message": "Hãy chọn và khóa một vùng trước" },
   "overlayImageReadError": { "message": "Không đọc được ảnh chụp từ Chrome." },
-  "overlayPngError": { "message": "Không thể tạo tệp PNG." },
+  "overlayPngError": { "message": "Không thể tạo tệp ảnh." },
   "overlayInvalidImage": { "message": "Chrome trả về ảnh không hợp lệ." },
   "overlayCanvasError": { "message": "Không thể xử lý ảnh bằng Canvas." },
   "overlayCaptureMissing": { "message": "Chrome không trả về ảnh chụp." },
-  "overlaySaved": { "message": "Đã lưu PNG" },
+  "overlaySaved": { "message": "Đã lưu ảnh" },
   "overlayCopied": { "message": "Đã sao chép vào clipboard" },
-  "overlayCopyFallback": { "message": "Trang này chặn clipboard — đã lưu PNG thay thế" },
+  "overlayCopyFallback": { "message": "Trang này chặn clipboard — đã lưu ảnh thay thế" },
   "overlayCaptureError": { "message": "Không thể chụp ảnh" },
   "errorUnknown": { "message": "Lỗi không xác định" },
   "errorRestricted": { "message": "Chrome không cho phép Region Snap hoạt động trên trang này." },
@@ -52,5 +52,25 @@
   "errorInvalidCommand": { "message": "Lệnh không hợp lệ." },
   "errorUnknownCaptureTab": { "message": "Không xác định được tab cần chụp." },
   "errorTabChanged": { "message": "Tab đã thay đổi trước khi ảnh được chụp." },
-  "errorNoLockedRegion": { "message": "Chưa có vùng nào được khóa trên tab này." }
+  "errorNoLockedRegion": { "message": "Chưa có vùng nào được khóa trên tab này." },
+  "popupSettings": { "message": "Cài đặt" },
+  "optionsTitle": { "message": "Cài đặt Region Snap" },
+  "optionsFormat": { "message": "Định dạng ảnh" },
+  "optionsFormatHint": {
+    "message": "Sao chép vào clipboard luôn dùng PNG. JPEG không có nền trong suốt nên góc bo sẽ có màu trắng."
+  },
+  "optionsCorners": { "message": "Góc ảnh" },
+  "optionsCornersLabel": { "message": "Bo tròn góc (12 px)" },
+  "optionsAction": { "message": "Hành động mặc định" },
+  "optionsActionDownload": { "message": "Tải ảnh về" },
+  "optionsActionCopy": { "message": "Sao chép vào clipboard" },
+  "optionsActionHint": {
+    "message": "Áp dụng cho phím Enter, phím tắt và popup. Các nút trên thanh công cụ luôn làm đúng tên của chúng."
+  },
+  "optionsFileName": { "message": "Tên tệp" },
+  "optionsFileNameLabel": { "message": "Tiền tố" },
+  "optionsFileNameExample": { "message": "Ví dụ:" },
+  "optionsReset": { "message": "Khôi phục mặc định" },
+  "optionsSaved": { "message": "Đã lưu" },
+  "optionsSaveError": { "message": "Không lưu được cài đặt" }
 }

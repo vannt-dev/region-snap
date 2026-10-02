@@ -10,7 +10,7 @@ test("manifest uses MV3 and on-demand injection", () => {
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.default_locale, "en");
   assert.equal(manifest.name, "__MSG_extensionName__");
-  assert.deepEqual(manifest.permissions.sort(), ["activeTab", "scripting"]);
+  assert.deepEqual(manifest.permissions.sort(), ["activeTab", "scripting", "storage"]);
   assert.equal(manifest.content_scripts, undefined);
 });
 
@@ -18,6 +18,9 @@ test("all extension entry files exist", () => {
   const requiredFiles = [
     manifest.background.service_worker,
     manifest.action.default_popup,
+    manifest.options_ui.page,
+    "options.js",
+    "options.css",
     "shared.js",
     "geometry.js",
     "content.js",

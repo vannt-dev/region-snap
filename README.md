@@ -17,6 +17,9 @@ content, while the desktop app captures regions across multiple displays with mi
 - Capture from the toolbar, `Enter`, or `Alt+Shift+C`.
 - **Copy** puts the PNG on the clipboard instead of downloading it; pages where the clipboard is
   unavailable (plain `http://`, for example) get the download as a fallback.
+- A settings page (popup → **Settings**) chooses the image format (PNG, JPEG or WebP), turns the
+  rounded corners off, sets the file name prefix, and makes `Enter` and the shortcut copy instead of
+  download.
 - While a move handle `⠿` is focused, use arrow keys to nudge it; hold `Shift` to move 10 px.
 - Crops against the real screenshot dimensions so zoom and display scaling stay accurate.
 - Exports a PNG with 12 px rounded corners and four transparent corners.
@@ -73,6 +76,7 @@ Keyboard shortcuts can be changed at `chrome://extensions/shortcuts`.
 
 - `activeTab`: access to the current tab only after a direct user action.
 - `scripting`: injects the region-selection UI into the active tab.
+- `storage`: keeps the four settings on this device. Nothing else is stored.
 
 The extension processes images entirely in the browser and never sends images to a server.
 

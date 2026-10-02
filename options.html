@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title data-i18n="optionsTitle">Region Snap settings</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main>
+      <h1 data-i18n="optionsTitle">Region Snap settings</h1>
+
+      <form id="settings-form" novalidate>
+        <fieldset>
+          <legend data-i18n="optionsFormat">Image format</legend>
+          <label><input type="radio" name="format" value="png" /> PNG</label>
+          <label><input type="radio" name="format" value="jpeg" /> JPEG</label>
+          <label><input type="radio" name="format" value="webp" /> WebP</label>
+          <p class="hint" data-i18n="optionsFormatHint">
+            Copying to the clipboard always uses PNG. JPEG has no transparency, so cut corners are
+            white.
+          </p>
+        </fieldset>
+
+        <fieldset>
+          <legend data-i18n="optionsCorners">Corners</legend>
+          <label>
+            <input type="checkbox" name="roundedCorners" />
+            <span data-i18n="optionsCornersLabel">Round the corners (12 px)</span>
+          </label>
+        </fieldset>
+
+        <fieldset>
+          <legend data-i18n="optionsAction">Default action</legend>
+          <label>
+            <input type="radio" name="defaultAction" value="download" />
+            <span data-i18n="optionsActionDownload">Download the image</span>
+          </label>
+          <label>
+            <input type="radio" name="defaultAction" value="copy" />
+            <span data-i18n="optionsActionCopy">Copy to the clipboard</span>
+          </label>
+          <p class="hint" data-i18n="optionsActionHint">
+            Used by Enter, the keyboard shortcut and the popup. The toolbar buttons always do what
+            they say.
+          </p>
+        </fieldset>
+
+        <fieldset>
+          <legend data-i18n="optionsFileName">File name</legend>
+          <label class="field">
+            <span data-i18n="optionsFileNameLabel">Prefix</span>
+            <input type="text" name="fileNamePrefix" spellcheck="false" autocomplete="off" />
+          </label>
+          <p class="hint">
+            <span data-i18n="optionsFileNameExample">Example:</span>
+            <code id="file-name-example"></code>
+          </p>
+        </fieldset>
+
+        <div class="footer">
+          <button id="reset" type="button" data-i18n="optionsReset">Restore defaults</button>
+          <span id="status" role="status" aria-live="polite"></span>
+        </div>
+      </form>
+    </main>
+    <script src="shared.js"></script>
+    <script src="options.js"></script>
+  </body>
+</html>

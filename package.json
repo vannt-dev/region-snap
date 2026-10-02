@@ -16,7 +16,7 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
-    "check": "node --check background.js && node --check geometry.js && node --check content.js && node --check popup.js && node --check desktop/capture-utils.cjs && node --check desktop/i18n.js && node --check desktop/main.cjs && node --check desktop/preload.cjs && node --check desktop/overlay.js && node --check desktop/settings-preload.cjs && node --check desktop/settings.js",
+    "check": "node --check background.js && node --check geometry.js && node --check content.js && node --check popup.js && node --check shared.js && node --check options.js && node --check desktop/capture-utils.cjs && node --check desktop/i18n.js && node --check desktop/main.cjs && node --check desktop/preload.cjs && node --check desktop/overlay.js && node --check desktop/settings-preload.cjs && node --check desktop/settings.js",
     "ci": "npm run check && npm run format:check && npm run lint && npm test && npm run build && npm run validate",
     "clean": "node scripts/clean.mjs",
     "desktop:start": "electron desktop/main.cjs",

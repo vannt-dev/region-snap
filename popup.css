@@ -294,6 +294,26 @@ kbd {
   margin-top: 4px;
 }
 
+.settings-link {
+  display: block;
+  margin: 10px 0 0 auto;
+  padding: 2px 4px;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 11px;
+  opacity: 0.75;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.settings-link:hover,
+.settings-link:focus-visible {
+  opacity: 1;
+}
+
 [hidden] {
   display: none !important;
 }

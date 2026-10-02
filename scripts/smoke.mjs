@@ -168,6 +168,69 @@ try {
   assert.deepEqual(clipboardTypes, ["image/png"]);
   assert.equal(downloadCount, downloadsBeforeCopy, "a successful copy must not also download");
 
+  // Stored settings drive the format, the corners, the file name and the default action.
+  const storeSettings = (settings) =>
+    evaluateIsolated(`
+      globalThis.chrome.storage = {
+        local: { get: async () => ({ settings: ${JSON.stringify(settings)} }) }
+      };
+    `);
+  await storeSettings({
+    defaultAction: "download",
+    fileNamePrefix: "shot",
+    format: "jpeg",
+    roundedCorners: false,
+  });
+  const jpegPromise = targetPage.waitForEvent("download");
+  await targetPage.locator(".region-snap-capture").click();
+  const jpeg = await jpegPromise;
+  assert.match(jpeg.suggestedFilename(), /^shot-\d{8}-\d{6}\.jpg$/);
+  const jpegSignature = (await fs.readFile(await jpeg.path())).subarray(0, 3).toString("hex");
+  assert.equal(jpegSignature, "ffd8ff");
+  await targetPage.locator(".region-snap-toast", { hasText: "overlaySaved" }).waitFor();
+
+  await storeSettings({ defaultAction: "copy", format: "jpeg" });
+  const downloadsBeforeDefaultCopy = downloadCount;
+  await evaluateIsolated(
+    `new Promise((resolve) =>
+      globalThis.__regionSnapListener({ type: "DO_CAPTURE" }, {}, resolve)
+    )`,
+    true,
+  );
+  await targetPage.locator(".region-snap-toast", { hasText: "overlayCopied" }).waitFor();
+  assert.equal(
+    downloadCount,
+    downloadsBeforeDefaultCopy,
+    "the default action must copy when the setting says so",
+  );
+
+  const options = await context.newPage();
+  const optionsErrors = [];
+  options.on("pageerror", (error) => optionsErrors.push(error.message));
+  await options.goto(`chrome-extension://${extensionId}/options.html`);
+  assert.equal(await options.locator('input[name="format"][value="png"]').isChecked(), true);
+  await options.locator('input[name="format"][value="webp"]').check();
+  await options.locator('input[name="roundedCorners"]').uncheck();
+  await options.locator('input[name="fileNamePrefix"]').fill("  my/shot?  ");
+  await options.locator('input[name="fileNamePrefix"]').blur();
+  await options.locator("#status", { hasText: /\S/ }).waitFor();
+  const storedSettings = await options.evaluate(async () => {
+    const stored = await globalThis.chrome.storage.local.get("settings");
+    return stored.settings;
+  });
+  assert.deepEqual(storedSettings, {
+    defaultAction: "download",
+    fileNamePrefix: "myshot",
+    format: "webp",
+    roundedCorners: false,
+  });
+  await options.reload();
+  assert.equal(await options.locator('input[name="format"][value="webp"]').isChecked(), true);
+  assert.equal(await options.locator('input[name="fileNamePrefix"]').inputValue(), "myshot");
+  assert.match(await options.locator("#file-name-example").innerText(), /^myshot-.*\.webp$/);
+  assert.deepEqual(optionsErrors, []);
+  await options.close();
+
   const page = await context.newPage();
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
