@@ -66,7 +66,7 @@ try {
       globalThis.chrome = {
         i18n: { getMessage: (key) => key },
         runtime: {
-          getManifest: () => ({ version: "1.1.0" }),
+          getManifest: () => ({ version: "1.2.0" }),
           onMessage: {
             addListener: (listener) => { globalThis.__regionSnapListener = listener; },
             removeListener: (listener) => {
