@@ -116,7 +116,12 @@ test("picker command injects CSS and script only when needed", async () => {
   assert.equal(runtime.calls.filter(([name]) => name === "insertCSS").length, 1);
   assert.equal(runtime.calls.filter(([name]) => name === "executeScript").length, 1);
   const injection = runtime.calls.find(([name]) => name === "executeScript");
-  assert.deepEqual(Array.from(injection[1].files), ["shared.js", "geometry.js", "content.js"]);
+  assert.deepEqual(Array.from(injection[1].files), [
+    "shared.js",
+    "geometry.js",
+    "annotations.js",
+    "content.js",
+  ]);
   assert.equal(
     runtime.calls.some(([, , message]) => message?.type === "START_PICKING"),
     true,

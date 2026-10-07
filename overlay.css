@@ -139,7 +139,7 @@
   position: fixed !important;
   left: 0 !important;
   top: 0 !important;
-  width: 224px !important;
+  width: max-content !important;
   min-height: 40px !important;
   transform: translate3d(var(--rs-toolbar-left), var(--rs-toolbar-top), 0) !important;
   align-items: center !important;
@@ -298,4 +298,95 @@
   #region-snap-root .region-snap-handle {
     animation: none !important;
   }
+}
+
+#region-snap-root .region-snap-marks {
+  display: none !important;
+  position: fixed !important;
+  left: 0 !important;
+  top: 0 !important;
+  width: var(--rs-width) !important;
+  height: var(--rs-height) !important;
+  transform: translate3d(var(--rs-left), var(--rs-top), 0) !important;
+  overflow: hidden !important;
+  border-radius: var(--rs-radius) !important;
+  pointer-events: none !important;
+}
+
+#region-snap-root[data-mode="locked"] .region-snap-marks {
+  display: block !important;
+}
+
+#region-snap-root[data-mode="locked"]:not([data-tool="none"]) .region-snap-marks {
+  pointer-events: auto !important;
+  cursor: crosshair !important;
+}
+
+#region-snap-root .region-snap-mark-surface {
+  position: absolute !important;
+  left: 0 !important;
+  top: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  transform: translate3d(calc(-1 * var(--rs-left)), calc(-1 * var(--rs-top)), 0) !important;
+  pointer-events: none !important;
+}
+
+#region-snap-root .region-snap-mark-svg {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: visible !important;
+  pointer-events: none !important;
+}
+
+#region-snap-root .region-snap-mark-svg line,
+#region-snap-root .region-snap-mark-svg rect {
+  fill: none !important;
+  stroke: #ef4444 !important;
+  stroke-width: 3px !important;
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+}
+
+#region-snap-root .region-snap-mark-svg polygon {
+  fill: #ef4444 !important;
+  stroke: #ef4444 !important;
+  stroke-width: 1px !important;
+  stroke-linejoin: round !important;
+}
+
+#region-snap-root .region-snap-hide {
+  position: absolute !important;
+  background: rgba(100, 116, 139, 0.35) !important;
+  backdrop-filter: blur(9px) !important;
+  outline: 1px dashed rgba(248, 250, 252, 0.7) !important;
+  outline-offset: -1px !important;
+  pointer-events: none !important;
+}
+
+#region-snap-root .region-snap-tool,
+#region-snap-root .region-snap-undo {
+  width: 28px !important;
+  padding: 0 !important;
+  color: #cbd5e1 !important;
+  background: transparent !important;
+  font-size: 15px !important;
+}
+
+#region-snap-root .region-snap-tool:hover,
+#region-snap-root .region-snap-undo:hover {
+  background: #334155 !important;
+}
+
+#region-snap-root .region-snap-tool[aria-pressed="true"] {
+  color: #ffffff !important;
+  background: #b91c1c !important;
+}
+
+#region-snap-root .region-snap-undo:disabled {
+  color: #475569 !important;
+  background: transparent !important;
+  cursor: default !important;
 }

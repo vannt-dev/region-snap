@@ -58,7 +58,7 @@ async function ensureInjected(tabId) {
       cssInserted = true;
       await chrome.scripting.executeScript({
         target: { tabId },
-        files: ["shared.js", "geometry.js", "content.js"],
+        files: ["shared.js", "geometry.js", "annotations.js", "content.js"],
       });
     } catch (error) {
       if (cssInserted) {

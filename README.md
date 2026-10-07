@@ -17,6 +17,11 @@ content, while the desktop app captures regions across multiple displays with mi
 - Capture from the toolbar, `Enter`, or `Alt+Shift+C`.
 - **Copy** puts the PNG on the clipboard instead of downloading it; pages where the clipboard is
   unavailable (plain `http://`, for example) get the download as a fallback.
+- Mark the locked region before capturing: the toolbar draws an **arrow** `↗`, a **box** `▢`, or
+  **hides an area** `▒` behind a mosaic, and `↶` (or `Ctrl+Z` while a tool is held) removes the last
+  mark. With a tool chosen a drag inside the region draws; `Esc` puts the tool down and the page is
+  interactive again. The marks are drawn into the image at its own resolution, and the hidden
+  area's detail is not in the saved file.
 - A settings page (popup → **Settings**) chooses the image format (PNG, JPEG or WebP), turns the
   rounded corners off, sets the file name prefix, and makes `Enter` and the shortcut copy instead of
   download.
@@ -92,6 +97,8 @@ Module boundaries and extension guidelines live in
 - `shared.js` is the single contract for messages, state, commands, and shortcuts across contexts.
 - `geometry.js` holds all region, resize, move, and crop-scaling math; it never touches the DOM and
   is unit tested in isolation.
+- `annotations.js` holds the marks: their geometry, and how they are drawn onto the cropped image.
+  Like `geometry.js` it never touches the DOM and is unit tested in isolation.
 - `content.js` only exists in a tab after the user requests region selection.
 - High-frequency pointer events are coalesced and rendered at most once per animation frame.
 - The overlay uses CSS custom properties and hardware-accelerated transforms, and never reads layout
