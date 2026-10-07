@@ -56,7 +56,7 @@ try {
     return result;
   }
   const runtimeSources = await Promise.all(
-    ["shared.js", "geometry.js", "content.js"].map((file) =>
+    ["shared.js", "geometry.js", "annotations.js", "content.js"].map((file) =>
       fs.readFile(path.join(DIST_DIR, file), "utf8"),
     ),
   );
@@ -80,7 +80,7 @@ try {
                 globalThis.__resolveCapture = () => resolve({ dataUrl: ${JSON.stringify(pngDataUrl)} });
               });
             }
-            return { dataUrl: ${JSON.stringify(pngDataUrl)} };
+            return { dataUrl: globalThis.__captureDataUrl || ${JSON.stringify(pngDataUrl)} };
           }
         }
       };
@@ -156,6 +156,120 @@ try {
   const downloadPath = await download.path();
   const signature = (await fs.readFile(downloadPath)).subarray(0, 8).toString("hex");
   assert.equal(signature, "89504e470d0a1a0a");
+
+  // Marks: a tool takes the pointer inside the region, draws on a drag, and gives the page
+  // back on Escape. The capture then carries the marks at the image's own resolution.
+  const root = targetPage.locator("#region-snap-root");
+  const region = await targetPage.locator(".region-snap-border").boundingBox();
+  const at = (fx, fy) => ({ x: region.x + region.width * fx, y: region.y + region.height * fy });
+  const drag = async (from, to) => {
+    await targetPage.mouse.move(from.x, from.y);
+    await targetPage.mouse.down();
+    await targetPage.mouse.move(to.x, to.y, { steps: 4 });
+    await targetPage.mouse.up();
+  };
+  const tool = (name) => targetPage.locator(`.region-snap-tool[data-tool="${name}"]`);
+
+  assert.equal(await root.getAttribute("data-tool"), "none");
+  assert.equal(await targetPage.locator(".region-snap-undo").isDisabled(), true);
+  await tool("arrow").click();
+  assert.equal(await root.getAttribute("data-tool"), "arrow");
+  assert.equal(await tool("arrow").getAttribute("aria-pressed"), "true");
+  await drag(at(0.2, 0.25), at(0.6, 0.25));
+  assert.equal(await targetPage.locator(".region-snap-mark-svg line").count(), 1);
+  assert.equal(await targetPage.locator(".region-snap-mark-svg polygon").count(), 1);
+
+  await tool("box").click();
+  await drag(at(0.1, 0.6), at(0.3, 0.9));
+  assert.equal(await targetPage.locator(".region-snap-mark-svg rect").count(), 1);
+
+  await tool("hide").click();
+  await drag(at(0.5, 0.6), at(0.9, 0.9));
+  assert.equal(await targetPage.locator(".region-snap-hide").count(), 1);
+  await drag(at(0.05, 0.05), at(0.06, 0.06));
+  assert.equal(
+    await targetPage.locator(".region-snap-hide").count(),
+    1,
+    "a drag of a few pixels must not leave a mark",
+  );
+  await drag(at(0.4, 0.1), at(0.45, 0.2));
+  assert.equal(await targetPage.locator(".region-snap-hide").count(), 2);
+  await targetPage.keyboard.press("Control+z");
+  assert.equal(await targetPage.locator(".region-snap-hide").count(), 1, "Ctrl+Z undoes a mark");
+
+  await targetPage.keyboard.press("Escape");
+  assert.equal(await root.getAttribute("data-tool"), "none");
+  assert.equal(await root.getAttribute("data-mode"), "locked", "Escape only puts the tool down");
+  await drag(at(0.2, 0.45), at(0.6, 0.45));
+  assert.equal(
+    await targetPage.locator(".region-snap-mark-svg line").count(),
+    1,
+    "without a tool a drag belongs to the page",
+  );
+
+  // A white screenshot with one black column inside the hidden area, the size of the viewport.
+  const viewport = targetPage.viewportSize();
+  const stripeX = Math.round(at(0.7, 0).x);
+  await evaluateIsolated(`(() => {
+    const canvas = globalThis.document.createElement("canvas");
+    canvas.width = ${viewport.width};
+    canvas.height = ${viewport.height};
+    const context = canvas.getContext("2d");
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = "#000000";
+    context.fillRect(${stripeX}, 0, 2, canvas.height);
+    globalThis.__captureDataUrl = canvas.toDataURL("image/png");
+  })()`);
+  const markedPromise = targetPage.waitForEvent("download");
+  await targetPage.locator(".region-snap-capture").click();
+  const marked = await markedPromise;
+  const markedBase64 = (await fs.readFile(await marked.path())).toString("base64");
+  await evaluateIsolated("globalThis.__captureDataUrl = null");
+  const probes = {
+    arrow: at(0.4, 0.25),
+    boxEdge: at(0.1, 0.75),
+    boxInside: at(0.2, 0.75),
+    hiddenStripe: { x: stripeX + 1, y: at(0, 0.75).y },
+    visibleStripe: { x: stripeX + 1, y: at(0, 0.4).y },
+  };
+  const pixels = await targetPage.evaluate(
+    async ({ base64, points, origin }) => {
+      const blob = await (await globalThis.fetch(`data:image/png;base64,${base64}`)).blob();
+      const bitmap = await globalThis.createImageBitmap(blob);
+      const canvas = globalThis.document.createElement("canvas");
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      const context = canvas.getContext("2d");
+      context.drawImage(bitmap, 0, 0);
+      const result = { width: bitmap.width, height: bitmap.height };
+      for (const [name, point] of Object.entries(points)) {
+        result[name] = Array.from(
+          context.getImageData(Math.round(point.x - origin.x), Math.round(point.y - origin.y), 1, 1)
+            .data,
+        );
+      }
+      return result;
+    },
+    { base64: markedBase64, points: probes, origin: { x: region.x, y: region.y } },
+  );
+  assert.equal(pixels.width, Math.round(region.width));
+  assert.equal(pixels.height, Math.round(region.height));
+  assert.deepEqual(pixels.arrow, [239, 68, 68, 255], "the arrow is drawn in the image");
+  assert.deepEqual(pixels.boxEdge, [239, 68, 68, 255], "the box outline is drawn in the image");
+  assert.deepEqual(pixels.boxInside, [255, 255, 255, 255], "a box is an outline, not a fill");
+  assert.deepEqual(pixels.visibleStripe, [0, 0, 0, 255], "outside the hidden area nothing changes");
+  assert.ok(
+    pixels.hiddenStripe[0] > 150 && pixels.hiddenStripe[0] < 255,
+    `the hidden area must average the stripe away, got ${pixels.hiddenStripe}`,
+  );
+
+  await targetPage.locator(".region-snap-undo").click();
+  await targetPage.locator(".region-snap-undo").click();
+  await targetPage.locator(".region-snap-undo").click();
+  assert.equal(await targetPage.locator(".region-snap-undo").isDisabled(), true);
+  assert.equal(await targetPage.locator(".region-snap-mark-svg > *").count(), 0);
+  assert.equal(await targetPage.locator(".region-snap-hide").count(), 0);
 
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   const downloadsBeforeCopy = downloadCount;
@@ -242,7 +356,7 @@ try {
   const manifest = JSON.parse(await fs.readFile(path.join(DIST_DIR, "manifest.json"), "utf8"));
   assert.equal(version, manifest.version);
   assert.deepEqual(pageErrors, []);
-  console.log(`Smoke test passed for selection, capture, and popup v${version}.`);
+  console.log(`Smoke test passed for selection, marks, capture, and popup v${version}.`);
 } finally {
   await context.close();
   await fs.rm(profile, { recursive: true, force: true });

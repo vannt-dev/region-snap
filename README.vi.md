@@ -14,6 +14,11 @@ Region Snap là công cụ chụp vùng riêng tư cho Chrome và Windows. Exten
 - Di chuyển và đổi kích thước vùng đã khóa.
 - Trang bên dưới vẫn tương tác bình thường sau khi khóa vùng.
 - Chụp bằng toolbar, phím `Enter` hoặc `Alt+Shift+C`.
+- Đánh dấu lên vùng đã khoá trước khi chụp: thanh công cụ vẽ **mũi tên** `↗`, **khung** `▢`, hoặc
+  **che một vùng** `▒` bằng mosaic; `↶` (hoặc `Ctrl+Z` khi đang cầm công cụ) bỏ nét vẽ gần nhất. Khi
+  đã chọn công cụ, kéo trong vùng chọn để vẽ; nhấn `Esc` để bỏ công cụ và trang tương tác lại như
+  thường. Nét vẽ được vẽ vào ảnh ở đúng độ phân giải của ảnh, và chi tiết trong vùng bị che không
+  còn trong file đã lưu.
 - Nút **Sao chép** đưa PNG vào clipboard thay vì tải về; trang không dùng được clipboard (ví dụ
   `http://` thường) sẽ tự chuyển sang tải file.
 - Trang cài đặt (popup → **Cài đặt**) cho chọn định dạng ảnh (PNG, JPEG hoặc WebP), tắt bo góc, đặt
@@ -83,6 +88,7 @@ Chi tiết ranh giới module và hướng dẫn mở rộng nằm tại [`docs/
 
 - `background.js` điều phối lệnh, chống inject trùng trên cùng tab và gọi API chụp của Chrome.
 - `shared.js` là contract duy nhất cho message, state, command và phím tắt giữa các context.
+- `annotations.js` chứa các nét đánh dấu: hình học của chúng và cách vẽ lên ảnh đã cắt; cũng không truy cập DOM và được unit test độc lập.
 - `geometry.js` chứa toàn bộ phép tính vùng, resize, di chuyển và tỷ lệ crop; module này không truy cập DOM và được unit test độc lập.
 - `content.js` chỉ tồn tại trong tab sau khi người dùng yêu cầu chọn vùng.
 - Các sự kiện chuột tốc độ cao được gộp và render tối đa một lần trong mỗi animation frame.

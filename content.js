@@ -7,7 +7,8 @@
 
   const Geometry = globalThis.RegionSnapGeometry;
   const Shared = globalThis.RegionSnapShared;
-  if (!Geometry || !Shared) {
+  const Annotations = globalThis.RegionSnapAnnotations;
+  if (!Geometry || !Shared || !Annotations) {
     console.error("Region Snap: required modules are unavailable.");
     return;
   }
@@ -36,6 +37,12 @@
   let previousCursor = "";
   let hasShownSelectHint = false;
   let hasShownLockedHint = false;
+  let hasShownMarkHint = false;
+  // Arrows, boxes and hidden areas drawn over the locked region, in viewport coordinates.
+  let marks = [];
+  let activeTool = null;
+  let markStart = null;
+  let draftMark = null;
 
   let root;
   let dim;
@@ -44,9 +51,16 @@
   let gripButton;
   let sizeLabel;
   let toast;
+  let markLayer;
+  let markSurface;
+  let markSvg;
+  let undoButton;
   const handles = {};
 
-  const TOOLBAR_WIDTH = 300;
+  const SVG_NS = "http://www.w3.org/2000/svg";
+  const TOOL_GLYPHS = { arrow: "↗", box: "▢", hide: "▒" };
+  const TOOL_LABELS = { arrow: "overlayToolArrow", box: "overlayToolBox", hide: "overlayToolHide" };
+  const TOOLBAR_WIDTH = 440;
   const TOOLBAR_HEIGHT = 40;
   const CORNER_RADIUS = 12;
 
@@ -91,19 +105,38 @@
     toolbar.innerHTML = `
       <button class="region-snap-grip" type="button" title="${t("overlayMove")}" aria-label="${t("overlayMove")}">⠿</button>
       <span class="region-snap-size" aria-live="polite"></span>
+      ${Annotations.TOOLS.map(
+        (tool) =>
+          `<button class="region-snap-tool" type="button" data-tool="${tool}" aria-pressed="false" title="${t(TOOL_LABELS[tool])}" aria-label="${t(TOOL_LABELS[tool])}">${TOOL_GLYPHS[tool]}</button>`,
+      ).join("")}
+      <button class="region-snap-undo" type="button" disabled title="${t("overlayUndo")}" aria-label="${t("overlayUndo")}">↶</button>
       <button class="region-snap-capture" type="button">${t("overlayCapture")}</button>
       <button class="region-snap-copy" type="button">${t("overlayCopy")}</button>
       <button class="region-snap-cancel" type="button" title="${t("overlayCancel")}" aria-label="${t("overlayCancel")}">×</button>
     `;
     gripButton = toolbar.querySelector(".region-snap-grip");
     sizeLabel = toolbar.querySelector(".region-snap-size");
+    undoButton = toolbar.querySelector(".region-snap-undo");
+
+    // The layer is the region's own box and clips what is drawn; the surface inside it is
+    // shifted back so its coordinates are the viewport's, the same ones the marks use.
+    markLayer = document.createElement("div");
+    markLayer.className = "region-snap-marks";
+    markSurface = document.createElement("div");
+    markSurface.className = "region-snap-mark-surface";
+    markSvg = document.createElementNS(SVG_NS, "svg");
+    markSvg.setAttribute("class", "region-snap-mark-svg");
+    markSvg.setAttribute("aria-hidden", "true");
+    markSurface.appendChild(markSvg);
+    markLayer.appendChild(markSurface);
 
     toast = document.createElement("div");
     toast.className = "region-snap-toast";
     toast.setAttribute("role", "status");
     toast.setAttribute("aria-live", "polite");
 
-    root.append(dim, border, toolbar, toast);
+    root.dataset.tool = "none";
+    root.append(dim, markLayer, border, toolbar, toast);
     for (const position of ["nw", "ne", "sw", "se"]) {
       const handle = document.createElement("button");
       handle.type = "button";
@@ -124,6 +157,17 @@
     toolbar.querySelector(".region-snap-cancel").addEventListener("click", (event) => {
       if (event.isTrusted) reset();
     });
+    for (const button of toolbar.querySelectorAll(".region-snap-tool")) {
+      button.addEventListener("click", (event) => {
+        if (!event.isTrusted) return;
+        const { tool } = event.currentTarget.dataset;
+        setTool(tool === activeTool ? null : tool);
+      });
+    }
+    undoButton.addEventListener("click", (event) => {
+      if (event.isTrusted) undoMark();
+    });
+    markLayer.addEventListener("mousedown", onMarkDown);
     gripButton.addEventListener("mousedown", onMoveGripDown);
     Object.values(handles).forEach((handle) => handle.addEventListener("mousedown", onHandleDown));
   }
@@ -131,6 +175,7 @@
   function removeOverlay() {
     root?.remove();
     root = dim = border = toolbar = gripButton = sizeLabel = toast = null;
+    markLayer = markSurface = markSvg = undoButton = null;
     for (const position of Object.keys(handles)) delete handles[position];
   }
 
@@ -188,6 +233,132 @@
     pendingRect = null;
     pendingHoverElement = element;
     requestRender();
+  }
+
+  function svgElement(name, attributes) {
+    const element = document.createElementNS(SVG_NS, name);
+    for (const [key, value] of Object.entries(attributes)) element.setAttribute(key, String(value));
+    return element;
+  }
+
+  // Redraws the marks from scratch. There are only ever a handful, and it runs when one is
+  // added, removed or dragged out, never on a pointer move over the page.
+  function renderMarks() {
+    if (!markSvg || !markSurface) return;
+    const visible = draftMark ? [...marks, draftMark] : marks;
+    markSvg.replaceChildren();
+    for (const element of markSurface.querySelectorAll(".region-snap-hide")) element.remove();
+
+    for (const mark of visible) {
+      if (mark.tool === "hide") {
+        const cover = document.createElement("div");
+        cover.className = "region-snap-hide";
+        cover.style.setProperty("left", `${mark.left}px`, "important");
+        cover.style.setProperty("top", `${mark.top}px`, "important");
+        cover.style.setProperty("width", `${mark.width}px`, "important");
+        cover.style.setProperty("height", `${mark.height}px`, "important");
+        markSurface.insertBefore(cover, markSvg);
+      } else if (mark.tool === "box") {
+        markSvg.appendChild(
+          svgElement("rect", {
+            x: mark.left,
+            y: mark.top,
+            width: mark.width,
+            height: mark.height,
+            rx: Annotations.BOX_RADIUS,
+          }),
+        );
+      } else {
+        const head = Annotations.arrowHead(mark);
+        if (!head) continue;
+        markSvg.append(
+          svgElement("line", {
+            x1: mark.x1,
+            y1: mark.y1,
+            x2: head.shaftEnd.x,
+            y2: head.shaftEnd.y,
+          }),
+          svgElement("polygon", {
+            points: [head.tip, head.left, head.right]
+              .map((point) => `${point.x},${point.y}`)
+              .join(" "),
+          }),
+        );
+      }
+    }
+    if (undoButton) undoButton.disabled = marks.length === 0;
+  }
+
+  // With a tool chosen the region takes the pointer so a drag draws; with none it lets the
+  // page through again, which is what a locked region normally does.
+  function setTool(tool) {
+    activeTool = Annotations.TOOLS.includes(tool) ? tool : null;
+    if (!root) return;
+    root.dataset.tool = activeTool || "none";
+    for (const button of toolbar.querySelectorAll(".region-snap-tool")) {
+      button.setAttribute("aria-pressed", String(button.dataset.tool === activeTool));
+    }
+    if (activeTool && !hasShownMarkHint) {
+      showToast(t("overlayMarkHint"));
+      hasShownMarkHint = true;
+    }
+  }
+
+  function undoMark() {
+    if (!marks.length) return;
+    marks = marks.slice(0, -1);
+    renderMarks();
+  }
+
+  function onMarkDown(event) {
+    if (
+      !event.isTrusted ||
+      !activeTool ||
+      !rect ||
+      state !== STATE.LOCKED ||
+      event.button !== 0 ||
+      capturing
+    )
+      return;
+    stopPageEvent(event);
+    markStart = { x: event.clientX, y: event.clientY };
+    draftMark = null;
+    root.dataset.interacting = "true";
+    document.addEventListener("mousemove", onMarkMove, true);
+    document.addEventListener("mouseup", onMarkUp, true);
+  }
+
+  function onMarkMove(event) {
+    if (!event.isTrusted || !markStart || !rect) return;
+    stopPageEvent(event);
+    draftMark = Annotations.createMark(
+      activeTool,
+      markStart,
+      { x: event.clientX, y: event.clientY },
+      rect,
+    );
+    renderMarks();
+  }
+
+  function onMarkUp(event) {
+    if (event && !event.isTrusted) return;
+    if (event) stopPageEvent(event);
+    const mark =
+      event && markStart && rect
+        ? Annotations.createMark(
+            activeTool,
+            markStart,
+            { x: event.clientX, y: event.clientY },
+            rect,
+          )
+        : null;
+    if (mark) marks = [...marks, mark];
+    markStart = null;
+    draftMark = null;
+    if (root) root.dataset.interacting = "false";
+    document.removeEventListener("mousemove", onMarkMove, true);
+    document.removeEventListener("mouseup", onMarkUp, true);
+    renderMarks();
   }
 
   function showToast(message, kind = "info") {
@@ -433,7 +604,21 @@
     if (!event.isTrusted) return;
     if (event.key === "Escape") {
       event.preventDefault();
-      reset();
+      // Escape first puts the drawing tool down; the region is cancelled by the next one.
+      if (activeTool) setTool(null);
+      else reset();
+      return;
+    }
+    // Only while a tool is held: otherwise Ctrl+Z belongs to whatever the page is editing.
+    if (
+      activeTool &&
+      (event.ctrlKey || event.metaKey) &&
+      !event.shiftKey &&
+      event.key.toLowerCase() === "z"
+    ) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      undoMark();
       return;
     }
     if (event.key === "Enter" && state === STATE.LOCKED && event.target === gripButton) {
@@ -469,6 +654,8 @@
     document.removeEventListener("mouseup", onHandleUp, true);
     document.removeEventListener("mousemove", onMoveMove, true);
     document.removeEventListener("mouseup", onMoveUp, true);
+    document.removeEventListener("mousemove", onMarkMove, true);
+    document.removeEventListener("mouseup", onMarkUp, true);
     document.removeEventListener("keydown", onKeyDown, true);
     document.removeEventListener("scroll", onPickingScroll, true);
     window.removeEventListener("resize", onViewportResize);
@@ -494,6 +681,10 @@
     moving = false;
     moveOffset = null;
     capturing = false;
+    marks = [];
+    activeTool = null;
+    markStart = null;
+    draftMark = null;
     removeOverlay();
   }
 
@@ -572,7 +763,14 @@
     }
   }
 
-  async function cropToBlob(dataUrl, selectedRect, settings) {
+  function createScratchCanvas(width, height) {
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    return canvas;
+  }
+
+  async function cropToBlob(dataUrl, selectedRect, settings, selectedMarks) {
     if (!dataUrl?.startsWith("data:image/")) throw new Error(t("overlayInvalidImage"));
     const image = await loadImage(dataUrl);
     const metrics = Geometry.getCropMetrics(selectedRect, viewportBounds(), {
@@ -611,6 +809,17 @@
       canvas.width,
       canvas.height,
     );
+    // The screenshot is taken with the overlay hidden, so the marks are not in it yet: they
+    // are drawn here, at the image's own resolution.
+    const visibleRect = fitRectToViewport(selectedRect);
+    Annotations.drawMarks(context, canvas, selectedMarks, {
+      origin: { left: visibleRect.left, top: visibleRect.top },
+      scale: {
+        x: canvas.width / Math.max(1, visibleRect.width),
+        y: canvas.height / Math.max(1, visibleRect.height),
+      },
+      createCanvas: createScratchCanvas,
+    });
     try {
       return await canvasToBlob(canvas, mime);
     } finally {
@@ -631,6 +840,7 @@
     capturing = true;
     const captureSession = sessionId;
     const selectedRect = { ...rect };
+    const selectedMarks = marks.map((mark) => ({ ...mark }));
     root.dataset.capturing = "true";
 
     try {
@@ -647,7 +857,7 @@
       const copy = (action || stored.defaultAction) === "copy";
       // The clipboard only takes PNG, so a copy ignores the chosen file format.
       const settings = copy ? { ...stored, format: "png" } : stored;
-      const blob = await cropToBlob(response.dataUrl, selectedRect, settings);
+      const blob = await cropToBlob(response.dataUrl, selectedRect, settings, selectedMarks);
       if (captureSession !== sessionId) return false;
       let message = t("overlaySaved");
       if (copy && (await copyBlob(blob))) {
