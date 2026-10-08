@@ -84,7 +84,7 @@ async function ensureInjected(tabId) {
 async function sendCommandToTab(tab, type) {
   assertSupportedTab(tab);
 
-  if (type === MESSAGE.START_PICKING) {
+  if (type === MESSAGE.START_PICKING || type === MESSAGE.CAPTURE_FULL_PAGE) {
     await ensureInjected(tab.id);
   } else if (!(await isInjected(tab.id))) {
     return { ok: false, error: t("errorNoSelection") };

@@ -145,6 +145,28 @@ test("concurrent picker commands share one injection task", async () => {
   assert.equal(runtime.calls.filter(([name]) => name === "executeScript").length, 1);
 });
 
+test("full-page command injects like the picker and reaches the page", async () => {
+  const harness = loadBackground();
+  await harness.getCommandListener()("capture-full-page", harness.tab);
+
+  assert.deepEqual(
+    harness.calls.map((call) => call[0]),
+    ["sendMessage", "insertCSS", "executeScript", "sendMessage"],
+  );
+  assert.equal(harness.calls.at(-1)[2].type, "CAPTURE_FULL_PAGE");
+
+  const popup = loadBackground({ injected: true });
+  const response = await sendRuntimeMessage(popup.getMessageListener(), {
+    type: "RUN_COMMAND",
+    command: "CAPTURE_FULL_PAGE",
+  });
+  assert.equal(response.ok, true);
+  assert.deepEqual(
+    popup.calls.map((call) => call[0]),
+    ["sendMessage", "sendMessage"],
+  );
+});
+
 test("capture command does not inject when no selection session exists", async () => {
   const runtime = loadBackground();
   const response = await sendRuntimeMessage(runtime.getMessageListener(), {

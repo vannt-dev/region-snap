@@ -21,6 +21,12 @@ Region Snap là công cụ chụp vùng riêng tư cho Chrome và Windows. Exten
   còn trong file đã lưu.
 - Nút **Sao chép** đưa PNG vào clipboard thay vì tải về; trang không dùng được clipboard (ví dụ
   `http://` thường) sẽ tự chuyển sang tải file.
+- **Chụp toàn trang** (popup, hoặc `Alt+Shift+F`) cuộn tài liệu từng khung nhìn một và ghép các
+  lát thành một ảnh, không kèm thanh cuộn. Header cố định chỉ nằm ở lát đầu và footer cố định chỉ
+  nằm ở lát cuối thay vì lặp lại suốt ảnh; phần tử sticky nằm đúng vị trí trong luồng. Chụp xong
+  trang được cuộn về chỗ cũ, và `Esc` dừng việc chụp.
+- **Hẹn giờ chụp** 3, 5 hoặc 10 giây (trong cài đặt) đếm ngược trước khi chụp vùng chọn, đủ để
+  mở menu hoặc rê chuột lên một phần tử. `Esc` dừng đếm ngược và giữ nguyên vùng chọn.
 - Trang cài đặt (popup → **Cài đặt**) cho chọn định dạng ảnh (PNG, JPEG hoặc WebP), tắt bo góc, đặt
   tiền tố tên tệp, và đổi phím `Enter` cùng phím tắt sang sao chép thay vì tải về.
 - Khi nút di chuyển `⠿` đang được focus, dùng phím mũi tên để tinh chỉnh; giữ `Shift` để di chuyển 10 px.
@@ -70,6 +76,9 @@ Sau mỗi lần thay đổi source, bấm **Reload** tại thẻ extension trư�
 5. Bấm **Capture**, nhấn `Enter`, hoặc dùng `Alt+Shift+C`.
 6. Nhấn `Esc` hoặc nút **×** để đóng overlay.
 
+Muốn chụp cả trang thay vì một vùng, chọn **Chụp toàn trang** trong popup hoặc nhấn `Alt+Shift+F`;
+ảnh dùng định dạng và hành động mặc định trong cài đặt.
+
 Có thể thay đổi phím tắt tại `chrome://extensions/shortcuts`.
 
 ## Quyền truy cập
@@ -98,6 +107,8 @@ Chi tiết ranh giới module và hướng dẫn mở rộng nằm tại [`docs/
 ## Giới hạn của Chrome
 
 Chrome không cho extension inject vào một số trang nội bộ như `chrome://`, trang Chrome Web Store và một số PDF/tab đặc biệt. Với URL `file://`, người dùng có thể cần bật **Allow access to file URLs** trong phần chi tiết extension.
+
+Chụp toàn trang lấy phần mà chính tài liệu cuộn. Trang cuộn bên trong một khung con (nhiều web app làm vậy) chỉ cho phần đang hiện trên màn hình, và nội dung tải thêm khi cuộn có thể làm chiều cao trang đổi sau khi đã tính xong. Chrome cho chụp hai ảnh mỗi giây nên trang dài mất một lúc, và một canvas cao tối đa 32.767 px: trang dài hơn bị cắt ở đó và toast có báo.
 
 ## Kiểm tra nhanh trước khi phát hành
 

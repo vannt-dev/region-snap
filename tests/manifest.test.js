@@ -36,3 +36,16 @@ test("all extension entry files exist", () => {
     assert.equal(fs.existsSync(path.join(projectRoot, file)), true, `${file} is missing`);
   }
 });
+
+test("every keyboard command is known to the shared contract and has a description", () => {
+  const shared = require("../shared.js");
+  const english = JSON.parse(
+    fs.readFileSync(path.join(projectRoot, "_locales/en/messages.json"), "utf8"),
+  );
+  assert.deepEqual(Object.keys(manifest.commands).sort(), Object.keys(shared.COMMAND_TO_MESSAGE));
+  for (const [name, command] of Object.entries(manifest.commands)) {
+    assert.equal(command.suggested_key.default, shared.DEFAULT_SHORTCUTS[name]);
+    const key = /^__MSG_(.+)__$/.exec(command.description)?.[1];
+    assert.ok(key && english[key]?.message, `${name} has no description`);
+  }
+});

@@ -22,6 +22,13 @@ content, while the desktop app captures regions across multiple displays with mi
   mark. With a tool chosen a drag inside the region draws; `Esc` puts the tool down and the page is
   interactive again. The marks are drawn into the image at its own resolution, and the hidden
   area's detail is not in the saved file.
+- **Capture full page** (popup, or `Alt+Shift+F`) scrolls the document a viewport at a time and
+  stitches the slices into one image, without the scrollbar. A fixed header is kept in the first
+  slice and a fixed footer in the last instead of repeating down the image; sticky elements sit
+  where they are in the flow. The page is scrolled back when it is done, and `Esc` stops it.
+- A **capture delay** of 3, 5 or 10 seconds (settings) counts down before a region is captured,
+  which leaves time to open a menu or hover something. `Esc` stops the countdown and keeps the
+  region.
 - A settings page (popup → **Settings**) chooses the image format (PNG, JPEG or WebP), turns the
   rounded corners off, sets the file name prefix, and makes `Enter` and the shortcut copy instead of
   download.
@@ -75,6 +82,9 @@ After every source change, click **Reload** on the extension card before testing
 5. Click **Capture**, press `Enter`, or use `Alt+Shift+C`.
 6. Press `Esc` or the **×** button to close the overlay.
 
+For the whole page instead of a region, choose **Capture full page** in the popup or press
+`Alt+Shift+F`; it uses the image format and the default action from the settings.
+
 Keyboard shortcuts can be changed at `chrome://extensions/shortcuts`.
 
 ## Permissions
@@ -111,6 +121,12 @@ Module boundaries and extension guidelines live in
 Chrome does not allow extensions to inject into certain internal pages such as `chrome://`, the
 Chrome Web Store, and some PDF/special tabs. For `file://` URLs, users may need to enable
 **Allow access to file URLs** in the extension's details.
+
+A full-page capture covers what the document itself scrolls. A page that scrolls inside an inner
+panel (many web apps do) gives only what is on screen, and content that loads while scrolling can
+change the page's height after the capture was planned. Chrome allows two screenshots a second, so
+a long page takes a moment, and one canvas holds at most 32,767 px in height: a longer page is cut
+there and the toast says so.
 
 ## Pre-release checks
 

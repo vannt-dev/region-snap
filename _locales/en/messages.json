@@ -6,12 +6,14 @@
   "actionTitle": { "message": "Region Snap" },
   "commandStart": { "message": "Select a region or element" },
   "commandCapture": { "message": "Capture the locked region" },
+  "commandFullPage": { "message": "Capture the full page" },
   "popupTagline": { "message": "Capture the exact moment" },
   "popupFlow": { "message": "Select → interact → capture" },
   "popupSelect": { "message": "Select a region" },
   "popupSelecting": { "message": "Selecting on page…" },
   "popupCapture": { "message": "Capture region" },
   "popupReselect": { "message": "Select again" },
+  "popupFullPage": { "message": "Capture full page" },
   "popupReady": { "message": "Ready to select" },
   "popupLocked": { "message": "Region locked" },
   "popupUnavailable": { "message": "Unavailable on this page" },
@@ -46,6 +48,17 @@
   "overlayCopied": { "message": "Copied to clipboard" },
   "overlayCopyFallback": { "message": "This page blocks the clipboard — image saved instead" },
   "overlayCaptureError": { "message": "Screenshot failed" },
+  "overlayCountdown": {
+    "message": "Capturing in $SECONDS$ s — Esc stops",
+    "placeholders": { "seconds": { "content": "$1" } }
+  },
+  "overlayCountdownStopped": { "message": "Countdown stopped" },
+  "overlayFullPageTruncated": {
+    "message": "The page is too long for one image — the first part was saved"
+  },
+  "overlayFullPageCopiedTruncated": {
+    "message": "The page is too long for one image — the first part was copied"
+  },
   "errorUnknown": { "message": "Unknown error" },
   "errorRestricted": { "message": "Chrome does not allow Region Snap to run on this page." },
   "errorNoTab": { "message": "No active tab was found." },
@@ -69,6 +82,11 @@
   "optionsActionCopy": { "message": "Copy to the clipboard" },
   "optionsActionHint": {
     "message": "Used by Enter, the keyboard shortcut and the popup. The toolbar buttons always do what they say."
+  },
+  "optionsDelay": { "message": "Capture delay" },
+  "optionsDelayOff": { "message": "Off" },
+  "optionsDelayHint": {
+    "message": "Counts down before a region is captured, so you can open a menu or hover first. Esc stops the countdown. A full-page capture starts at once."
   },
   "optionsFileName": { "message": "File name" },
   "optionsFileNameLabel": { "message": "Prefix" },

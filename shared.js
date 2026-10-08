@@ -1,5 +1,6 @@
 ((scope) => {
   const MESSAGE = Object.freeze({
+    CAPTURE_FULL_PAGE: "CAPTURE_FULL_PAGE",
     CAPTURE_TAB: "CAPTURE_TAB",
     DO_CAPTURE: "DO_CAPTURE",
     GET_ACTIVE_STATUS: "GET_ACTIVE_STATUS",
@@ -17,11 +18,13 @@
   });
 
   const COMMAND_TO_MESSAGE = Object.freeze({
+    "capture-full-page": MESSAGE.CAPTURE_FULL_PAGE,
     "capture-region": MESSAGE.DO_CAPTURE,
     "toggle-picker": MESSAGE.START_PICKING,
   });
 
   const DEFAULT_SHORTCUTS = Object.freeze({
+    "capture-full-page": "Alt+Shift+F",
     "capture-region": "Alt+Shift+C",
     "toggle-picker": "Alt+Shift+S",
   });
@@ -36,7 +39,11 @@
 
   const CAPTURE_ACTIONS = Object.freeze(["download", "copy"]);
 
+  // Seconds counted down before a region is captured; 0 captures at once.
+  const CAPTURE_DELAYS = Object.freeze([0, 3, 5, 10]);
+
   const DEFAULT_SETTINGS = Object.freeze({
+    captureDelay: 0,
     defaultAction: "download",
     fileNamePrefix: "region-snap",
     format: "png",
@@ -64,6 +71,9 @@
   function normalizeSettings(raw) {
     const value = raw && typeof raw === "object" ? raw : {};
     return {
+      captureDelay: CAPTURE_DELAYS.includes(value.captureDelay)
+        ? value.captureDelay
+        : DEFAULT_SETTINGS.captureDelay,
       defaultAction: CAPTURE_ACTIONS.includes(value.defaultAction)
         ? value.defaultAction
         : DEFAULT_SETTINGS.defaultAction,
@@ -88,6 +98,7 @@
   const api = Object.freeze({
     ALLOWED_PROTOCOLS: Object.freeze(["http:", "https:", "file:"]),
     CAPTURE_ACTIONS,
+    CAPTURE_DELAYS,
     COMMAND_TO_MESSAGE,
     DEFAULT_SETTINGS,
     DEFAULT_SHORTCUTS,

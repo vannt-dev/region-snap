@@ -6,12 +6,14 @@
   "actionTitle": { "message": "Region Snap" },
   "commandStart": { "message": "Chọn vùng hoặc phần tử" },
   "commandCapture": { "message": "Chụp vùng đã khóa" },
+  "commandFullPage": { "message": "Chụp toàn bộ trang" },
   "popupTagline": { "message": "Chụp đúng khoảnh khắc" },
   "popupFlow": { "message": "Chọn → tương tác → chụp" },
   "popupSelect": { "message": "Chọn vùng" },
   "popupSelecting": { "message": "Đang chọn trên trang…" },
   "popupCapture": { "message": "Chụp vùng" },
   "popupReselect": { "message": "Chọn lại" },
+  "popupFullPage": { "message": "Chụp toàn trang" },
   "popupReady": { "message": "Sẵn sàng chọn vùng" },
   "popupLocked": { "message": "Đã khóa vùng" },
   "popupUnavailable": { "message": "Không hỗ trợ trên trang này" },
@@ -46,6 +48,15 @@
   "overlayCopied": { "message": "Đã sao chép vào clipboard" },
   "overlayCopyFallback": { "message": "Trang này chặn clipboard — đã lưu ảnh thay thế" },
   "overlayCaptureError": { "message": "Không thể chụp ảnh" },
+  "overlayCountdown": {
+    "message": "Chụp sau $SECONDS$ giây — Esc để dừng",
+    "placeholders": { "seconds": { "content": "$1" } }
+  },
+  "overlayCountdownStopped": { "message": "Đã dừng đếm ngược" },
+  "overlayFullPageTruncated": { "message": "Trang quá dài cho một ảnh — đã lưu phần đầu" },
+  "overlayFullPageCopiedTruncated": {
+    "message": "Trang quá dài cho một ảnh — đã sao chép phần đầu"
+  },
   "errorUnknown": { "message": "Lỗi không xác định" },
   "errorRestricted": { "message": "Chrome không cho phép Region Snap hoạt động trên trang này." },
   "errorNoTab": { "message": "Không tìm thấy tab đang mở." },
@@ -71,6 +82,11 @@
   "optionsActionCopy": { "message": "Sao chép vào clipboard" },
   "optionsActionHint": {
     "message": "Áp dụng cho phím Enter, phím tắt và popup. Các nút trên thanh công cụ luôn làm đúng tên của chúng."
+  },
+  "optionsDelay": { "message": "Hẹn giờ chụp" },
+  "optionsDelayOff": { "message": "Tắt" },
+  "optionsDelayHint": {
+    "message": "Đếm ngược trước khi chụp vùng chọn, để bạn kịp mở menu hoặc rê chuột. Esc dừng đếm ngược. Chụp toàn trang bắt đầu ngay."
   },
   "optionsFileName": { "message": "Tên tệp" },
   "optionsFileNameLabel": { "message": "Tiền tố" },
