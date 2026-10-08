@@ -8,6 +8,7 @@ test("shared communication contract is immutable and internally consistent", () 
   assert.equal(Object.isFrozen(shared.MESSAGE), true);
   assert.equal(Object.isFrozen(shared.STATE), true);
   assert.deepEqual(Object.values(shared.COMMAND_TO_MESSAGE).sort(), [
+    shared.MESSAGE.CAPTURE_FULL_PAGE,
     shared.MESSAGE.DO_CAPTURE,
     shared.MESSAGE.START_PICKING,
   ]);
@@ -19,6 +20,7 @@ test("stored settings fall back to defaults field by field", () => {
   assert.deepEqual(shared.normalizeSettings("garbage"), shared.DEFAULT_SETTINGS);
   assert.deepEqual(
     shared.normalizeSettings({
+      captureDelay: 4,
       defaultAction: "upload",
       fileNamePrefix: 42,
       format: "gif",
@@ -29,7 +31,21 @@ test("stored settings fall back to defaults field by field", () => {
   );
   assert.deepEqual(
     shared.normalizeSettings({ defaultAction: "copy", format: "webp", roundedCorners: false }),
-    { defaultAction: "copy", fileNamePrefix: "region-snap", format: "webp", roundedCorners: false },
+    {
+      captureDelay: 0,
+      defaultAction: "copy",
+      fileNamePrefix: "region-snap",
+      format: "webp",
+      roundedCorners: false,
+    },
+  );
+  // Only the offered delays pass, and only as numbers: a form value arrives as text.
+  assert.equal(shared.normalizeSettings({ captureDelay: 5 }).captureDelay, 5);
+  assert.equal(shared.normalizeSettings({ captureDelay: "5" }).captureDelay, 0);
+  assert.equal(shared.normalizeSettings({ captureDelay: -3 }).captureDelay, 0);
+  assert.deepEqual(
+    Object.keys(shared.DEFAULT_SHORTCUTS).sort(),
+    [...Object.keys(shared.COMMAND_TO_MESSAGE)].sort(),
   );
   // A lookup on the prototype chain must not pass for a format name.
   assert.equal(shared.normalizeSettings({ format: "toString" }).format, "png");

@@ -3,6 +3,8 @@ const secondaryButton = document.getElementById("secondary-action");
 const primaryLabel = document.getElementById("primary-label");
 const primaryShortcut = document.getElementById("primary-shortcut");
 const secondaryShortcut = document.getElementById("secondary-shortcut");
+const fullPageButton = document.getElementById("full-page-action");
+const fullPageShortcut = document.getElementById("full-page-shortcut");
 const stateLabel = document.getElementById("state-label");
 const stateDetail = document.getElementById("state-detail");
 const errorMessage = document.getElementById("error-message");
@@ -26,6 +28,7 @@ function setBusy(busy) {
   document.body.classList.toggle("is-busy", busy);
   primaryButton.disabled = busy || document.body.dataset.state === "unsupported";
   secondaryButton.disabled = busy;
+  fullPageButton.disabled = busy || document.body.dataset.state === "unsupported";
 }
 
 function showError(message) {
@@ -103,6 +106,7 @@ async function loadShortcuts() {
       ...Object.fromEntries(commands.map((command) => [command.name, command.shortcut || ""])),
     };
     showShortcut(secondaryShortcut, shortcuts["toggle-picker"]);
+    showShortcut(fullPageShortcut, shortcuts["capture-full-page"]);
     showShortcut(
       primaryShortcut,
       primaryCommand === MESSAGE.DO_CAPTURE
@@ -125,6 +129,7 @@ async function loadStatus() {
 
 primaryButton.addEventListener("click", () => runCommand(primaryCommand));
 secondaryButton.addEventListener("click", () => runCommand(MESSAGE.START_PICKING));
+fullPageButton.addEventListener("click", () => runCommand(MESSAGE.CAPTURE_FULL_PAGE));
 document.getElementById("open-settings").addEventListener("click", () => {
   chrome.runtime.openOptionsPage();
 });

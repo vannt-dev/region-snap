@@ -47,6 +47,21 @@
         </fieldset>
 
         <fieldset>
+          <legend data-i18n="optionsDelay">Capture delay</legend>
+          <label>
+            <input type="radio" name="captureDelay" value="0" />
+            <span data-i18n="optionsDelayOff">Off</span>
+          </label>
+          <label><input type="radio" name="captureDelay" value="3" /> 3 s</label>
+          <label><input type="radio" name="captureDelay" value="5" /> 5 s</label>
+          <label><input type="radio" name="captureDelay" value="10" /> 10 s</label>
+          <p class="hint" data-i18n="optionsDelayHint">
+            Counts down before a region is captured, so you can open a menu or hover first. Esc
+            stops the countdown. A full-page capture starts at once.
+          </p>
+        </fieldset>
+
+        <fieldset>
           <legend data-i18n="optionsFileName">File name</legend>
           <label class="field">
             <span data-i18n="optionsFileNameLabel">Prefix</span>

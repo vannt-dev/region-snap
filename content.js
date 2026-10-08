@@ -16,7 +16,9 @@
   const { IMAGE_FORMATS, MESSAGE, SETTINGS_KEY, STATE, buildFileName, normalizeSettings } = Shared;
   const MIN_SIZE = 8;
   const LOSSY_QUALITY = 0.92;
-  const t = (key) => chrome.i18n.getMessage(key) || key;
+  // Chrome allows two captureVisibleTab calls a second; full-page slices keep clear of that.
+  const CAPTURE_INTERVAL_MS = 600;
+  const t = (key, substitutions) => chrome.i18n.getMessage(key, substitutions) || key;
 
   let state = STATE.IDLE;
   let rect = null;
@@ -43,6 +45,9 @@
   let activeTool = null;
   let markStart = null;
   let draftMark = null;
+  // Set while a capture delay is counting down; calling it stops the countdown.
+  let stopCountdown = null;
+  let fullPageRun = null;
 
   let root;
   let dim;
@@ -604,8 +609,10 @@
     if (!event.isTrusted) return;
     if (event.key === "Escape") {
       event.preventDefault();
-      // Escape first puts the drawing tool down; the region is cancelled by the next one.
-      if (activeTool) setTool(null);
+      // Escape first stops a countdown, then puts the drawing tool down; the region is
+      // cancelled by the next one.
+      if (stopCountdown) stopCountdown();
+      else if (activeTool) setTool(null);
       else reset();
       return;
     }
@@ -663,6 +670,7 @@
 
   function reset() {
     sessionId += 1;
+    stopCountdown?.();
     removeInteractionListeners();
     clearTimeout(clickCleanupTimer);
     clearTimeout(toastTimer);
@@ -829,6 +837,46 @@
     }
   }
 
+  const DELIVERY_MESSAGES = {
+    copied: "overlayCopied",
+    fallback: "overlayCopyFallback",
+    saved: "overlaySaved",
+  };
+
+  // Copies or downloads the finished image and says which of the two happened.
+  async function deliver(blob, settings, copy) {
+    if (copy && (await copyBlob(blob))) return "copied";
+    downloadBlob(blob, settings);
+    return copy ? "fallback" : "saved";
+  }
+
+  // Counts the delay down in the toast, a second a tick. Resolves true when it ran out and
+  // false when Escape or a new selection stopped it.
+  function countDown(seconds, captureSession) {
+    return new Promise((resolve) => {
+      let remaining = seconds;
+      let timer = null;
+      const finish = (completed) => {
+        clearTimeout(timer);
+        stopCountdown = null;
+        resolve(completed);
+      };
+      const tick = () => {
+        if (captureSession !== sessionId) {
+          finish(false);
+        } else if (remaining <= 0) {
+          finish(true);
+        } else {
+          showToast(t("overlayCountdown", [String(remaining)]));
+          remaining -= 1;
+          timer = window.setTimeout(tick, 1000);
+        }
+      };
+      stopCountdown = () => finish(false);
+      tick();
+    });
+  }
+
   // `action` is "download" or "copy"; left out, the user's default action applies.
   async function doCapture({ action } = {}) {
     if (state !== STATE.LOCKED || !rect) {
@@ -839,11 +887,18 @@
 
     capturing = true;
     const captureSession = sessionId;
-    const selectedRect = { ...rect };
-    const selectedMarks = marks.map((mark) => ({ ...mark }));
-    root.dataset.capturing = "true";
 
     try {
+      const stored = await loadSettings();
+      if (captureSession !== sessionId) return false;
+      if (stored.captureDelay > 0 && !(await countDown(stored.captureDelay, captureSession))) {
+        if (root && captureSession === sessionId) showToast(t("overlayCountdownStopped"));
+        return false;
+      }
+      // Read after the countdown: the region and its marks may be adjusted while it runs.
+      const selectedRect = { ...rect };
+      const selectedMarks = marks.map((mark) => ({ ...mark }));
+      root.dataset.capturing = "true";
       await nextFrame();
       await nextFrame();
       if (captureSession !== sessionId) return false;
@@ -852,23 +907,15 @@
         throw new Error(response?.error || t("overlayCaptureMissing"));
       }
       if (captureSession !== sessionId) return false;
-      const stored = await loadSettings();
-      if (captureSession !== sessionId) return false;
       const copy = (action || stored.defaultAction) === "copy";
       // The clipboard only takes PNG, so a copy ignores the chosen file format.
       const settings = copy ? { ...stored, format: "png" } : stored;
       const blob = await cropToBlob(response.dataUrl, selectedRect, settings, selectedMarks);
       if (captureSession !== sessionId) return false;
-      let message = t("overlaySaved");
-      if (copy && (await copyBlob(blob))) {
-        message = t("overlayCopied");
-      } else {
-        if (copy) message = t("overlayCopyFallback");
-        downloadBlob(blob, settings);
-      }
+      const outcome = await deliver(blob, settings, copy);
       if (root && captureSession === sessionId) {
         root.dataset.capturing = "false";
-        showToast(message, "success");
+        showToast(t(DELIVERY_MESSAGES[outcome]), "success");
       }
       return true;
     } catch (error) {
@@ -880,6 +927,231 @@
       return false;
     } finally {
       if (captureSession === sessionId) capturing = false;
+    }
+  }
+
+  // A fixed element would repeat in every slice of a full-page capture, so those in the top
+  // half of the viewport are kept for the first slice only and those in the bottom half for the
+  // last. A sticky element goes back to where it sits in the flow. All of it is undone after.
+  function prepareFullPageLayout() {
+    const sticky = [];
+    const top = [];
+    const bottom = [];
+    const middle = window.innerHeight / 2;
+    for (const element of document.querySelectorAll("body *")) {
+      if (isOwnElement(element)) continue;
+      const { position } = getComputedStyle(element);
+      if (position === "sticky") {
+        sticky.push(element);
+      } else if (position === "fixed") {
+        const bounds = element.getBoundingClientRect();
+        if (bounds.width > 0 && bounds.height > 0) {
+          (bounds.top + bounds.height / 2 < middle ? top : bottom).push(element);
+        }
+      }
+    }
+
+    const undo = [];
+    const override = (element, property, value) => {
+      undo.push([
+        element,
+        property,
+        element.style.getPropertyValue(property),
+        element.style.getPropertyPriority(property),
+      ]);
+      element.style.setProperty(property, value, "important");
+    };
+    for (const element of sticky) {
+      override(element, "position", "relative");
+      for (const side of ["top", "right", "bottom", "left"]) override(element, side, "auto");
+    }
+
+    const hidden = new Map();
+    const setVisible = (elements, visible) => {
+      for (const element of elements) {
+        if (visible && hidden.has(element)) {
+          element.style.setProperty("visibility", ...hidden.get(element));
+          hidden.delete(element);
+        } else if (!visible && !hidden.has(element)) {
+          hidden.set(element, [
+            element.style.getPropertyValue("visibility"),
+            element.style.getPropertyPriority("visibility"),
+          ]);
+          element.style.setProperty("visibility", "hidden", "important");
+        }
+      }
+    };
+
+    return {
+      showFor(isFirst, isLast) {
+        setVisible(top, isFirst);
+        setVisible(bottom, isLast);
+      },
+      restore() {
+        setVisible([...top, ...bottom], true);
+        for (const [element, property, value, priority] of undo.splice(0).reverse()) {
+          element.style.setProperty(property, value, priority);
+        }
+      },
+    };
+  }
+
+  // The overlay of a full-page capture only carries the toast; nothing is selected behind it.
+  function closeIdleOverlay() {
+    if (state !== STATE.IDLE) return;
+    clearTimeout(toastTimer);
+    removeOverlay();
+  }
+
+  function onFullPageKeyDown(event) {
+    if (!event.isTrusted || event.key !== "Escape" || !fullPageRun) return;
+    event.preventDefault();
+    fullPageRun.cancelled = true;
+  }
+
+  // Photographs the page a viewport at a time and stitches the slices into one image. It
+  // covers what the document itself scrolls; a page that scrolls inside an inner panel only
+  // gives what is on screen.
+  async function captureFullPage() {
+    if (capturing) return false;
+    if (state === STATE.IDLE) sessionId += 1;
+    else reset();
+
+    capturing = true;
+    const captureSession = sessionId;
+    const run = { cancelled: false };
+    fullPageRun = run;
+    const stopped = () => run.cancelled || captureSession !== sessionId;
+    const scroller = document.scrollingElement || document.documentElement;
+    const scrollStart = { left: window.scrollX, top: window.scrollY };
+    const scrollBack = () => window.scrollTo({ ...scrollStart, behavior: "instant" });
+    let layout = null;
+    let canvas = null;
+
+    injectOverlay();
+    root.dataset.capturing = "true";
+    document.addEventListener("keydown", onFullPageKeyDown, true);
+
+    try {
+      const stored = await loadSettings();
+      if (stopped()) return false;
+      const copy = stored.defaultAction === "copy";
+      // The clipboard only takes PNG, so a copy ignores the chosen file format.
+      const settings = copy ? { ...stored, format: "png" } : stored;
+      const { mime } = IMAGE_FORMATS[settings.format];
+      const viewport = {
+        width: scroller.clientWidth || window.innerWidth,
+        height: scroller.clientHeight || window.innerHeight,
+      };
+      const pageHeight = scroller.scrollHeight;
+      layout = prepareFullPageLayout();
+
+      let plan = null;
+      let scale = null;
+      let context = null;
+      let lastCaptureAt = 0;
+      for (let index = 0; !plan || index < plan.positions.length; index += 1) {
+        window.scrollTo({
+          left: scrollStart.left,
+          top: plan ? plan.positions[index] : 0,
+          behavior: "instant",
+        });
+        layout.showFor(
+          index === 0,
+          plan ? index === plan.positions.length - 1 : pageHeight <= viewport.height,
+        );
+        await nextFrame();
+        await nextFrame();
+        const pause = CAPTURE_INTERVAL_MS - (Date.now() - lastCaptureAt);
+        if (pause > 0) await new Promise((resolve) => window.setTimeout(resolve, pause));
+        if (stopped()) return false;
+
+        const top = window.scrollY;
+        const response = await chrome.runtime.sendMessage({ type: MESSAGE.CAPTURE_TAB });
+        lastCaptureAt = Date.now();
+        if (!response || response.error) {
+          throw new Error(response?.error || t("overlayCaptureMissing"));
+        }
+        if (stopped()) return false;
+        if (!response.dataUrl?.startsWith("data:image/")) throw new Error(t("overlayInvalidImage"));
+        const image = await loadImage(response.dataUrl);
+
+        if (!plan) {
+          scale = {
+            x: image.naturalWidth / window.innerWidth,
+            y: image.naturalHeight / window.innerHeight,
+          };
+          plan = Geometry.planFullPage(
+            { height: pageHeight, viewportWidth: viewport.width, viewportHeight: viewport.height },
+            scale,
+          );
+          canvas = createScratchCanvas(plan.width, plan.height);
+          context = canvas.getContext("2d");
+          if (!context) throw new Error(t("overlayCanvasError"));
+          if (mime === "image/jpeg") {
+            context.fillStyle = "#ffffff";
+            context.fillRect(0, 0, canvas.width, canvas.height);
+          }
+        }
+        // The scrollbar is left out: only the part of the screenshot the page lays out in.
+        const sliceWidth = viewport.width * scale.x;
+        const sliceHeight = viewport.height * scale.y;
+        context.drawImage(
+          image,
+          0,
+          0,
+          sliceWidth,
+          sliceHeight,
+          0,
+          Math.round(top * scale.y),
+          sliceWidth,
+          sliceHeight,
+        );
+        image.src = "";
+      }
+
+      layout.restore();
+      scrollBack();
+      const blob = await canvasToBlob(canvas, mime);
+      if (stopped()) return false;
+      const outcome = await deliver(blob, settings, copy);
+      if (root && captureSession === sessionId) {
+        root.dataset.capturing = "false";
+        let message = DELIVERY_MESSAGES[outcome];
+        if (plan.truncated) {
+          message =
+            outcome === "copied" ? "overlayFullPageCopiedTruncated" : "overlayFullPageTruncated";
+        }
+        showToast(t(message), "success");
+      }
+      return true;
+    } catch (error) {
+      if (root && captureSession === sessionId) {
+        root.dataset.capturing = "false";
+        showToast(error?.message || t("overlayCaptureError"), "error");
+      }
+      console.error("Region Snap full-page capture failed:", error);
+      return false;
+    } finally {
+      layout?.restore();
+      scrollBack();
+      if (canvas) {
+        canvas.width = 1;
+        canvas.height = 1;
+      }
+      document.removeEventListener("keydown", onFullPageKeyDown, true);
+      if (fullPageRun === run) fullPageRun = null;
+      if (captureSession === sessionId) {
+        capturing = false;
+        if (run.cancelled) {
+          closeIdleOverlay();
+        } else {
+          // Leave the toast up for as long as it shows, then take the empty overlay away.
+          window.setTimeout(() => {
+            if (captureSession === sessionId) closeIdleOverlay();
+          }, 3000);
+        }
+      }
     }
   }
 
@@ -895,6 +1167,11 @@
     }
     if (message?.type === MESSAGE.START_PICKING) {
       startPicking();
+      sendResponse({ ok: true, state });
+      return false;
+    }
+    if (message?.type === MESSAGE.CAPTURE_FULL_PAGE) {
+      captureFullPage();
       sendResponse({ ok: true, state });
       return false;
     }

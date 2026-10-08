@@ -26,6 +26,7 @@ function localizeDocument() {
 
 function readForm() {
   return normalizeSettings({
+    captureDelay: Number(form.elements.captureDelay.value),
     defaultAction: form.elements.defaultAction.value,
     fileNamePrefix: prefixInput.value,
     format: form.elements.format.value,
@@ -34,6 +35,7 @@ function readForm() {
 }
 
 function fillForm(settings) {
+  form.elements.captureDelay.value = String(settings.captureDelay);
   form.elements.defaultAction.value = settings.defaultAction;
   form.elements.format.value = settings.format;
   form.elements.roundedCorners.checked = settings.roundedCorners;

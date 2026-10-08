@@ -80,6 +80,7 @@ try {
                 globalThis.__resolveCapture = () => resolve({ dataUrl: ${JSON.stringify(pngDataUrl)} });
               });
             }
+            if (globalThis.__captureFactory) return { dataUrl: globalThis.__captureFactory() };
             return { dataUrl: globalThis.__captureDataUrl || ${JSON.stringify(pngDataUrl)} };
           }
         }
@@ -318,6 +319,160 @@ try {
     "the default action must copy when the setting says so",
   );
 
+  // A capture delay counts down in the toast; Escape stops it and keeps the region.
+  await storeSettings({ captureDelay: 3, defaultAction: "download" });
+  const downloadsBeforeCountdown = downloadCount;
+  await targetPage.locator(".region-snap-capture").click();
+  await targetPage.locator(".region-snap-toast", { hasText: "overlayCountdown" }).waitFor();
+  await targetPage.keyboard.press("Escape");
+  await targetPage.locator(".region-snap-toast", { hasText: "overlayCountdownStopped" }).waitFor();
+  assert.equal(await root.getAttribute("data-mode"), "locked", "Escape only stops the countdown");
+  await targetPage.waitForTimeout(1300);
+  assert.equal(downloadCount, downloadsBeforeCountdown, "a stopped countdown must not capture");
+
+  const countdownStart = Date.now();
+  const delayedPromise = targetPage.waitForEvent("download");
+  await targetPage.locator(".region-snap-capture").click();
+  await delayedPromise;
+  const waited = Date.now() - countdownStart;
+  assert.ok(waited >= 2900, `the capture must wait out the delay, waited ${waited} ms`);
+
+  // Full page: the document is photographed a viewport at a time and stitched. Each stub
+  // screenshot is filled with a colour that encodes the scroll offset it was taken at.
+  await storeSettings({ captureDelay: 0, defaultAction: "download", format: "png" });
+  const pageMetrics = await targetPage.evaluate(() => {
+    const { document } = globalThis;
+    const add = (id, style) => {
+      const element = document.createElement("div");
+      element.id = id;
+      element.style.cssText = style;
+      document.body.appendChild(element);
+    };
+    add("smoke-sticky", "position: sticky; top: 10px; height: 20px; background: #0a0");
+    add("smoke-tall", "height: 2000px");
+    add("smoke-header", "position: fixed; top: 0; left: 0; width: 100%; height: 30px");
+    add("smoke-footer", "position: fixed; bottom: 0; left: 0; width: 100%; height: 30px");
+    globalThis.scrollTo(0, 300);
+    const page = document.documentElement;
+    return { height: page.scrollHeight, width: page.clientWidth, viewport: page.clientHeight };
+  });
+  const positions = [];
+  for (let top = 0; top < pageMetrics.height; top += pageMetrics.viewport) {
+    positions.push(Math.min(top, pageMetrics.height - pageMetrics.viewport));
+  }
+  assert.ok(positions.length >= 3, "the smoke page must need several slices");
+  await evaluateIsolated(`
+    globalThis.__captureLog = [];
+    globalThis.__captureFactory = () => {
+      const { document } = globalThis;
+      const style = (id) => globalThis.getComputedStyle(document.getElementById(id));
+      const top = Math.round(globalThis.scrollY);
+      globalThis.__captureLog.push({
+        top,
+        header: style("smoke-header").visibility,
+        footer: style("smoke-footer").visibility,
+        sticky: style("smoke-sticky").position,
+        overlay: globalThis.getComputedStyle(document.getElementById("region-snap-root")).opacity,
+        at: Date.now(),
+      });
+      const canvas = document.createElement("canvas");
+      canvas.width = globalThis.innerWidth;
+      canvas.height = globalThis.innerHeight;
+      const context = canvas.getContext("2d");
+      context.fillStyle = "rgb(" + (top >> 8) + "," + (top & 255) + ",100)";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      return canvas.toDataURL("image/png");
+    };
+  `);
+  const fullPagePromise = targetPage.waitForEvent("download");
+  await evaluateIsolated(
+    `new Promise((resolve) =>
+      globalThis.__regionSnapListener({ type: "CAPTURE_FULL_PAGE" }, {}, resolve)
+    )`,
+    true,
+  );
+  const fullPage = await fullPagePromise;
+  const fullPageBase64 = (await fs.readFile(await fullPage.path())).toString("base64");
+  await targetPage.locator(".region-snap-toast", { hasText: "overlaySaved" }).waitFor();
+  const captureLog = JSON.parse(
+    (await evaluateIsolated("JSON.stringify(globalThis.__captureLog)")).result.value,
+  );
+  await evaluateIsolated("globalThis.__captureFactory = null");
+  const lastSlice = positions.length - 1;
+  assert.deepEqual(
+    captureLog.map((entry) => entry.top),
+    positions,
+    "one screenshot per viewport, the last flush with the page bottom",
+  );
+  assert.deepEqual(
+    captureLog.map((entry) => entry.header),
+    positions.map((_top, index) => (index === 0 ? "visible" : "hidden")),
+    "a fixed header belongs to the first slice only",
+  );
+  assert.deepEqual(
+    captureLog.map((entry) => entry.footer),
+    positions.map((_top, index) => (index === lastSlice ? "visible" : "hidden")),
+    "a fixed footer belongs to the last slice only",
+  );
+  assert.ok(
+    captureLog.every((entry) => entry.sticky === "relative" && entry.overlay === "0"),
+    "sticky elements sit in the flow and the overlay is hidden in every slice",
+  );
+  for (let index = 1; index < captureLog.length; index += 1) {
+    const gap = captureLog[index].at - captureLog[index - 1].at;
+    assert.ok(gap >= 550, `slices must respect Chrome's capture quota, gap was ${gap} ms`);
+  }
+  const sliceColour = (top) => [top >> 8, top & 255, 100, 255];
+  const fullPagePixels = await targetPage.evaluate(
+    async ({ base64, rows }) => {
+      const blob = await (await globalThis.fetch(`data:image/png;base64,${base64}`)).blob();
+      const bitmap = await globalThis.createImageBitmap(blob);
+      const canvas = globalThis.document.createElement("canvas");
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      const context = canvas.getContext("2d");
+      context.drawImage(bitmap, 0, 0);
+      return {
+        width: bitmap.width,
+        height: bitmap.height,
+        rows: rows.map((y) => Array.from(context.getImageData(10, y, 1, 1).data)),
+      };
+    },
+    {
+      base64: fullPageBase64,
+      rows: [5, pageMetrics.viewport + 5, positions[lastSlice] - 5, pageMetrics.height - 5],
+    },
+  );
+  assert.equal(fullPagePixels.width, pageMetrics.width, "the scrollbar is not part of the image");
+  assert.equal(fullPagePixels.height, pageMetrics.height);
+  assert.deepEqual(fullPagePixels.rows, [
+    sliceColour(positions[0]),
+    sliceColour(positions[1]),
+    sliceColour(positions[lastSlice - 1]),
+    sliceColour(positions[lastSlice]),
+  ]);
+  assert.deepEqual(
+    await targetPage.evaluate(() => {
+      const style = (id) => globalThis.getComputedStyle(globalThis.document.getElementById(id));
+      return {
+        scrollY: globalThis.scrollY,
+        header: style("smoke-header").visibility,
+        footer: style("smoke-footer").visibility,
+        sticky: style("smoke-sticky").position,
+        inline: globalThis.document.getElementById("smoke-sticky").style.cssText,
+      };
+    }),
+    {
+      scrollY: 300,
+      header: "visible",
+      footer: "visible",
+      sticky: "sticky",
+      inline: "position: sticky; top: 10px; height: 20px; background: rgb(0, 170, 0);",
+    },
+    "the page is put back as it was",
+  );
+  await targetPage.locator("#region-snap-root").waitFor({ state: "detached", timeout: 6000 });
+
   const options = await context.newPage();
   const optionsErrors = [];
   options.on("pageerror", (error) => optionsErrors.push(error.message));
@@ -325,6 +480,8 @@ try {
   assert.equal(await options.locator('input[name="format"][value="png"]').isChecked(), true);
   await options.locator('input[name="format"][value="webp"]').check();
   await options.locator('input[name="roundedCorners"]').uncheck();
+  assert.equal(await options.locator('input[name="captureDelay"][value="0"]').isChecked(), true);
+  await options.locator('input[name="captureDelay"][value="5"]').check();
   await options.locator('input[name="fileNamePrefix"]').fill("  my/shot?  ");
   await options.locator('input[name="fileNamePrefix"]').blur();
   await options.locator("#status", { hasText: /\S/ }).waitFor();
@@ -333,6 +490,7 @@ try {
     return stored.settings;
   });
   assert.deepEqual(storedSettings, {
+    captureDelay: 5,
     defaultAction: "download",
     fileNamePrefix: "myshot",
     format: "webp",
@@ -341,6 +499,7 @@ try {
   await options.reload();
   assert.equal(await options.locator('input[name="format"][value="webp"]').isChecked(), true);
   assert.equal(await options.locator('input[name="fileNamePrefix"]').inputValue(), "myshot");
+  assert.equal(await options.locator('input[name="captureDelay"][value="5"]').isChecked(), true);
   assert.match(await options.locator("#file-name-example").innerText(), /^myshot-.*\.webp$/);
   assert.deepEqual(optionsErrors, []);
   await options.close();
@@ -351,12 +510,15 @@ try {
   await page.goto(`chrome-extension://${extensionId}/popup.html`);
   await page.locator("h1", { hasText: "Region Snap" }).waitFor();
   await page.locator("#primary-action").waitFor();
+  await page.locator("#full-page-action").waitFor();
   await page.locator(".status-card").waitFor();
   const version = await page.evaluate(() => globalThis.chrome.runtime.getManifest().version);
   const manifest = JSON.parse(await fs.readFile(path.join(DIST_DIR, "manifest.json"), "utf8"));
   assert.equal(version, manifest.version);
   assert.deepEqual(pageErrors, []);
-  console.log(`Smoke test passed for selection, marks, capture, and popup v${version}.`);
+  console.log(
+    `Smoke test passed for selection, marks, capture, delay, full page, and popup v${version}.`,
+  );
 } finally {
   await context.close();
   await fs.rm(profile, { recursive: true, force: true });
