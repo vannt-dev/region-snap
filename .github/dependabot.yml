@@ -17,10 +17,11 @@ updates:
     schedule:
       interval: weekly
     groups:
-      github-actions-minor-and-patch:
-        update-types:
-          - minor
-          - patch
+      # Majors too: an action's major is usually a new runtime, and one pull request per action
+      # was five at once on the first run.
+      github-actions:
+        patterns:
+          - "*"
     commit-message:
       prefix: chore
       include: scope
