@@ -8,6 +8,9 @@ _[Đọc bằng tiếng Việt](README.vi.md)_
 A private screenshot utility for Chrome and Windows. The Chrome extension can lock onto live page
 content, while the desktop app captures regions across multiple displays with mixed DPI.
 
+Official builds are listed at [vannt-dev.github.io/official.html](https://vannt-dev.github.io/official.html);
+anything else is not published by vannt-dev.
+
 ## Features
 
 - Quick-select a single element with a click.

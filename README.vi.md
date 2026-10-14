@@ -7,6 +7,9 @@ _[Read in English](README.md)_
 
 Region Snap là công cụ chụp vùng riêng tư cho Chrome và Windows. Extension có thể khóa vùng nội dung web đang chạy, còn ứng dụng desktop chụp xuyên nhiều màn hình với DPI khác nhau.
 
+Các bản build chính thức được liệt kê tại [vannt-dev.github.io/official.html](https://vannt-dev.github.io/official.html);
+bản nào không có ở đó thì không phải do vannt-dev phát hành.
+
 ## Tính năng
 
 - Chọn nhanh một phần tử bằng cách bấm chuột.
