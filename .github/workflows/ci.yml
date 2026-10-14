@@ -28,7 +28,7 @@ jobs:
       - name: Create Store package
         run: npm run package:store
       - name: Upload Store package
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: region-snap-store-package
           path: release/*.zip
@@ -71,7 +71,7 @@ jobs:
       - name: Build NSIS installer
         run: npm run desktop:dist
       - name: Upload Windows installer
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: region-snap-windows-installer
           path: release/Region-Snap-Setup-*.exe
