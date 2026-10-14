@@ -110,7 +110,7 @@ jobs:
           path: release
           merge-multiple: true
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
           body: ${{ needs.desktop.outputs.signed == 'true' && 'Includes the Chrome extension package and signed Windows installer.' || 'The Chrome extension package is available now. The signed Windows installer will be attached after the code-signing certificate is configured.' }}
