@@ -1,3 +1,4 @@
+/*! SPDX-License-Identifier: MIT | Copyright (c) 2026 vannt-dev | github.com/vannt-dev/region-snap */
 importScripts("shared.js");
 
 const { ALLOWED_PROTOCOLS, COMMAND_TO_MESSAGE, MESSAGE, STATE } = globalThis.RegionSnapShared;

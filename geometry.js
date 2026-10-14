@@ -1,3 +1,4 @@
+/*! SPDX-License-Identifier: MIT | Copyright (c) 2026 vannt-dev | github.com/vannt-dev/region-snap */
 ((scope) => {
   const clamp = (value, min, max) => Math.min(Math.max(value, min), Math.max(min, max));
 

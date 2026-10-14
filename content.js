@@ -1,3 +1,4 @@
+/*! SPDX-License-Identifier: MIT | Copyright (c) 2026 vannt-dev | github.com/vannt-dev/region-snap */
 (() => {
   const CONTENT_VERSION = chrome.runtime.getManifest().version;
   const previousController = window.__regionSnapController;

@@ -1,3 +1,4 @@
+/*! SPDX-License-Identifier: MIT | Copyright (c) 2026 vannt-dev | github.com/vannt-dev/region-snap */
 ((scope) => {
   const MESSAGE = Object.freeze({
     CAPTURE_FULL_PAGE: "CAPTURE_FULL_PAGE",
