@@ -1,3 +1,4 @@
+/*! SPDX-License-Identifier: MIT | Copyright (c) 2026 vannt-dev | github.com/vannt-dev/region-snap */
 ((scope) => {
   const TOOLS = Object.freeze(["arrow", "box", "hide"]);
   const MARK_COLOR = "#ef4444";

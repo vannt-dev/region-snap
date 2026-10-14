@@ -1,3 +1,4 @@
+/*! SPDX-License-Identifier: MIT | Copyright (c) 2026 vannt-dev | github.com/vannt-dev/region-snap */
 const {
   DEFAULT_SETTINGS,
   FILE_NAME_PREFIX_MAX_LENGTH,

@@ -1,3 +1,4 @@
+/*! SPDX-License-Identifier: MIT | Copyright (c) 2026 vannt-dev | github.com/vannt-dev/region-snap */
 (() => {
   const Geometry = globalThis.RegionSnapGeometry;
   const { translate } = globalThis.RegionSnapI18n;

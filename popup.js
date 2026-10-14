@@ -1,3 +1,4 @@
+/*! SPDX-License-Identifier: MIT | Copyright (c) 2026 vannt-dev | github.com/vannt-dev/region-snap */
 const primaryButton = document.getElementById("primary-action");
 const secondaryButton = document.getElementById("secondary-action");
 const primaryLabel = document.getElementById("primary-label");
