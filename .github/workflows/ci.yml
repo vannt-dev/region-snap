@@ -4,6 +4,10 @@ on:
   push:
     branches: [main, develop]
   pull_request:
+    paths-ignore:
+      - '*.md'
+      - 'docs/**'
+      - LICENSE
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
