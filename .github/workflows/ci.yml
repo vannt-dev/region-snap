@@ -5,8 +5,8 @@ on:
     branches: [main, develop]
   pull_request:
     paths-ignore:
-      - '*.md'
-      - 'docs/**'
+      - "*.md"
+      - "docs/**"
       - LICENSE
 
 concurrency:
