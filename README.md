@@ -26,6 +26,10 @@ anything else is not published by vannt-dev.
   mark. With a tool chosen a drag inside the region draws; `Esc` puts the tool down and the page is
   interactive again. The marks are drawn into the image at its own resolution, and the hidden
   area's detail is not in the saved file.
+- **Text** `T` adds a note: click inside the region and type; `Enter` keeps it, `Shift+Enter`
+  starts a new line and `Esc` cancels. Click a note to change it, drag it to move it, and pick
+  small, medium or large with the `A` button. **Steps** `①` drop numbered circles 1, 2, 3… with
+  each click; undo removes the last one and the next click reuses its number.
 - **Capture full page** (popup, or `Alt+Shift+F`) scrolls the document a viewport at a time and
   stitches the slices into one image, without the scrollbar. A fixed header is kept in the first
   slice and a fixed footer in the last instead of repeating down the image; sticky elements sit
@@ -38,7 +42,8 @@ anything else is not published by vannt-dev.
   download.
 - While a move handle `⠿` is focused, use arrow keys to nudge it; hold `Shift` to move 10 px.
 - Crops against the real screenshot dimensions so zoom and display scaling stay accurate.
-- Exports a PNG with 12 px rounded corners and four transparent corners.
+- Saves PNG by default with 12 px rounded, transparent corners; the format and the corners can be
+  changed in the settings.
 - English UI by default; automatically switches to Vietnamese based on the Chrome language.
 - Only injects into a tab on explicit user request; the extension never runs persistently on every
   site.
@@ -95,7 +100,8 @@ Keyboard shortcuts can be changed at `chrome://extensions/shortcuts`.
 
 - `activeTab`: access to the current tab only after a direct user action.
 - `scripting`: injects the region-selection UI into the active tab.
-- `storage`: keeps the four settings on this device. Nothing else is stored.
+- `storage`: keeps the settings (image format, corners, file name prefix, default action and
+  capture delay) on this device. Nothing else is stored.
 
 The extension processes images entirely in the browser and never sends images to a server.
 

@@ -33,6 +33,19 @@
   "overlayToolArrow": { "message": "Draw an arrow" },
   "overlayToolBox": { "message": "Draw a box" },
   "overlayToolHide": { "message": "Hide an area" },
+  "overlayToolText": { "message": "Add text" },
+  "overlayToolStep": { "message": "Number the steps" },
+  "overlayTextSize": {
+    "message": "Text size: $SIZE$",
+    "placeholders": { "size": { "content": "$1" } }
+  },
+  "overlayTextSmall": { "message": "small" },
+  "overlayTextMedium": { "message": "medium" },
+  "overlayTextLarge": { "message": "large" },
+  "overlayTextHint": {
+    "message": "Click to add text, or on a note to change it; drag a note to move it. Enter keeps it, Shift+Enter adds a line, Esc cancels."
+  },
+  "overlayStepHint": { "message": "Click to drop numbered steps: 1, 2, 3… Undo removes the last." },
   "overlayUndo": { "message": "Undo the last mark" },
   "overlayMarkHint": { "message": "Drag inside the region to draw. Esc returns to the page." },
   "overlaySelectHint": { "message": "Click an element or drag to select a region" },

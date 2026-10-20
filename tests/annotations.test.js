@@ -10,7 +10,11 @@ function recordingContext(log, name = "main") {
   const call =
     (method) =>
     (...args) =>
-      log.push([name, method, ...args.filter((value) => typeof value === "number")]);
+      log.push([
+        name,
+        method,
+        ...args.filter((value) => typeof value === "number" || typeof value === "string"),
+      ]);
   return new Proxy(state, {
     get(target, property) {
       if (property in target) return target[property];
@@ -62,6 +66,13 @@ test("a click or a sliver is not a mark", () => {
     null,
   );
   assert.equal(annotations.createMark("pen", { x: 200, y: 200 }, { x: 320, y: 320 }, region), null);
+  for (const tool of annotations.CLICK_TOOLS) {
+    assert.equal(
+      annotations.createMark(tool, { x: 200, y: 200 }, { x: 320, y: 320 }, region),
+      null,
+      `${tool} is placed with a click, not drawn with a drag`,
+    );
+  }
 });
 
 test("an arrow head points along the arrow and the shaft stops at its base", () => {
@@ -162,4 +173,123 @@ test("an image without marks is left untouched", () => {
     createCanvas: () => assert.fail("no scratch canvas is needed"),
   });
   assert.deepEqual(log, []);
+});
+
+test("a step is numbered one more than the highest step left", () => {
+  assert.equal(annotations.nextStepNumber([]), 1);
+  const first = annotations.createStepMark({ x: 150, y: 100 }, [], region);
+  assert.deepEqual(first, { tool: "step", x: 150, y: 100, number: 1 });
+  const box = { tool: "box", left: 150, top: 80, width: 40, height: 20 };
+  const second = annotations.createStepMark({ x: 200, y: 100 }, [first, box], region);
+  assert.equal(second.number, 2);
+  const third = annotations.createStepMark({ x: 250, y: 100 }, [first, box, second], region);
+  assert.equal(third.number, 3);
+});
+
+test("after an undo the numbering carries on from the steps that are left", () => {
+  const marks = [];
+  for (const x of [150, 200, 250]) {
+    marks.push(annotations.createStepMark({ x, y: 100 }, marks, region));
+  }
+  marks.pop();
+  assert.equal(annotations.nextStepNumber(marks), 3);
+  assert.equal(annotations.createStepMark({ x: 300, y: 100 }, marks, region).number, 3);
+  marks.splice(0);
+  assert.equal(annotations.nextStepNumber(marks), 1);
+});
+
+test("a step circle stays whole inside the region", () => {
+  const step = annotations.createStepMark({ x: 90, y: 400 }, [], region);
+  assert.equal(step.x, region.left + annotations.STEP_RADIUS);
+  assert.equal(step.y, region.top + region.height - annotations.STEP_RADIUS);
+  assert.equal(annotations.createStepMark({ x: 150, y: 100 }, [], null), null);
+});
+
+test("a text mark keeps its lines and size, and empty text is no mark", () => {
+  assert.deepEqual(
+    annotations.createTextMark({ x: 120, y: 60 }, "Click here\r\nthen here", "large", region),
+    { tool: "text", x: 120, y: 60, text: "Click here\nthen here", size: "large" },
+  );
+  assert.equal(
+    annotations.createTextMark({ x: 120, y: 60 }, "note", "huge", region).size,
+    "medium",
+    "an unknown size falls back to medium",
+  );
+  assert.deepEqual(annotations.createTextMark({ x: 10, y: 900 }, "x", "small", region), {
+    tool: "text",
+    x: 100,
+    y: 350,
+    text: "x",
+    size: "small",
+  });
+  assert.equal(annotations.createTextMark({ x: 120, y: 60 }, "  \n ", "small", region), null);
+  assert.equal(annotations.createTextMark({ x: 120, y: 60 }, 42, "small", region), null);
+});
+
+test("the text font grows with the size and the image scale", () => {
+  assert.match(
+    annotations.textFont("small"),
+    new RegExp(`^600 ${annotations.TEXT_SIZES.small}px `),
+  );
+  assert.match(
+    annotations.textFont("large", 2),
+    new RegExp(`^600 ${annotations.TEXT_SIZES.large * 2}px `),
+  );
+  assert.ok(annotations.TEXT_SIZES.small < annotations.TEXT_SIZES.medium);
+  assert.ok(annotations.TEXT_SIZES.medium < annotations.TEXT_SIZES.large);
+});
+
+test("text and steps are converted from the viewport to image pixels", () => {
+  const origin = { left: 100, top: 50 };
+  const scale = { x: 2, y: 2 };
+  assert.deepEqual(
+    annotations.toOutput({ tool: "text", x: 120, y: 60, text: "Hi", size: "small" }, origin, scale),
+    { tool: "text", x: 40, y: 20, text: "Hi", size: "small" },
+  );
+  assert.deepEqual(
+    annotations.toOutput({ tool: "step", x: 150, y: 100, number: 4 }, origin, scale),
+    { tool: "step", x: 100, y: 100, number: 4 },
+  );
+});
+
+test("text and step numbers are drawn into the image at its resolution", () => {
+  const log = [];
+  annotations.drawMarks(
+    recordingContext(log),
+    { width: 800, height: 600 },
+    [
+      { tool: "text", x: 120, y: 60, text: "First\nSecond", size: "medium" },
+      { tool: "step", x: 150, y: 100, number: 1 },
+      { tool: "step", x: 250, y: 100, number: 2 },
+    ],
+    { origin: { left: 100, top: 50 }, scale: { x: 2, y: 2 }, createCanvas: () => null },
+  );
+
+  const fonts = log.filter(([, method]) => method === "set:font").map(([, , value]) => value);
+  assert.ok(fonts.includes(annotations.textFont("medium", 2)), "the text font is scaled");
+
+  const size = annotations.TEXT_SIZES.medium * 2;
+  const lineHeight = size * annotations.TEXT_LINE_HEIGHT;
+  const firstTop = 20 + (lineHeight - size) / 2;
+  const filled = log.filter(([, method]) => method === "fillText");
+  assert.deepEqual(filled, [
+    ["main", "fillText", "First", 40, firstTop],
+    ["main", "fillText", "Second", 40, firstTop + lineHeight],
+    ["main", "fillText", "1", 100, 100],
+    ["main", "fillText", "2", 300, 100],
+  ]);
+  assert.equal(
+    log.filter(([, method]) => method === "strokeText").length,
+    2,
+    "every text line gets a light outline so it reads on any background",
+  );
+
+  const circles = log.filter(([, method]) => method === "arc");
+  assert.deepEqual(
+    circles.map(([, , x, y, radius]) => [x, y, radius]),
+    [
+      [100, 100, annotations.STEP_RADIUS * 2],
+      [300, 100, annotations.STEP_RADIUS * 2],
+    ],
+  );
 });

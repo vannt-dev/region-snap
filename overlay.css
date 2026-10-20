@@ -141,6 +141,8 @@
   left: 0 !important;
   top: 0 !important;
   width: max-content !important;
+  max-width: calc(100vw - 16px) !important;
+  flex-wrap: wrap !important;
   min-height: 40px !important;
   transform: translate3d(var(--rs-toolbar-left), var(--rs-toolbar-top), 0) !important;
   align-items: center !important;
@@ -390,4 +392,95 @@
   color: #475569 !important;
   background: transparent !important;
   cursor: default !important;
+}
+
+#region-snap-root .region-snap-text-size {
+  display: none !important;
+  width: 28px !important;
+  padding: 0 !important;
+  color: #cbd5e1 !important;
+  background: transparent !important;
+}
+
+#region-snap-root[data-tool="text"] .region-snap-text-size {
+  display: inline-block !important;
+}
+
+#region-snap-root .region-snap-text-size:hover {
+  background: #334155 !important;
+}
+
+#region-snap-root .region-snap-text-size[data-size="small"] {
+  font-size: 11px !important;
+}
+
+#region-snap-root .region-snap-text-size[data-size="medium"] {
+  font-size: 14px !important;
+}
+
+#region-snap-root .region-snap-text-size[data-size="large"] {
+  font-size: 18px !important;
+}
+
+#region-snap-root .region-snap-mark-svg circle {
+  fill: #ef4444 !important;
+  stroke: #ffffff !important;
+  stroke-width: 2px !important;
+}
+
+#region-snap-root .region-snap-mark-svg text {
+  fill: #ffffff !important;
+  stroke: none !important;
+  font:
+    700 14px "Segoe UI",
+    system-ui,
+    -apple-system,
+    Roboto,
+    sans-serif !important;
+  text-anchor: middle !important;
+  dominant-baseline: central !important;
+}
+
+#region-snap-root .region-snap-text,
+#region-snap-root .region-snap-text-editor {
+  position: absolute !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  color: #ef4444 !important;
+  white-space: pre !important;
+  letter-spacing: normal !important;
+  text-align: left !important;
+  text-transform: none !important;
+}
+
+#region-snap-root .region-snap-text {
+  text-shadow:
+    -1px -1px 0 #ffffff,
+    1px -1px 0 #ffffff,
+    -1px 1px 0 #ffffff,
+    1px 1px 0 #ffffff,
+    0 0 3px #ffffff !important;
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
+#region-snap-root[data-tool="text"] .region-snap-text {
+  pointer-events: auto !important;
+  cursor: move !important;
+}
+
+#region-snap-root .region-snap-text-editor {
+  display: block !important;
+  min-width: 2ch !important;
+  overflow: hidden !important;
+  resize: none !important;
+  field-sizing: content !important;
+  background: rgba(255, 255, 255, 0.85) !important;
+  border: 0 !important;
+  border-radius: 2px !important;
+  outline: 1px dashed #ef4444 !important;
+  outline-offset: 2px !important;
+  box-shadow: none !important;
+  caret-color: #ef4444 !important;
+  pointer-events: auto !important;
 }
