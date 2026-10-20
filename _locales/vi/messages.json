@@ -72,6 +72,18 @@
   "overlayFullPageCopiedTruncated": {
     "message": "Trang quá dài cho một ảnh — đã sao chép phần đầu"
   },
+  "overlayScrollCapture": {
+    "message": "Chụp toàn bộ khung cuộn hoặc phần tử cao dưới vùng chọn"
+  },
+  "overlayScrollNothing": {
+    "message": "Không có gì để cuộn: không có khung cuộn và không có phần tử nào cao hơn cửa sổ"
+  },
+  "overlayScrollTruncated": { "message": "Quá cao cho một ảnh — đã lưu phần đầu" },
+  "overlayScrollCopiedTruncated": { "message": "Quá cao cho một ảnh — đã sao chép phần đầu" },
+  "overlayScrollPartial": {
+    "message": "Một phần của vùng không thể cuộn tới, nên ảnh chỉ có phần cuộn tới được"
+  },
+  "overlayScrollStopped": { "message": "Đã dừng chụp cuộn" },
   "errorUnknown": { "message": "Lỗi không xác định" },
   "errorRestricted": { "message": "Chrome không cho phép Region Snap hoạt động trên trang này." },
   "errorNoTab": { "message": "Không tìm thấy tab đang mở." },

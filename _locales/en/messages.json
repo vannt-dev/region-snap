@@ -72,6 +72,22 @@
   "overlayFullPageCopiedTruncated": {
     "message": "The page is too long for one image — the first part was copied"
   },
+  "overlayScrollCapture": {
+    "message": "Capture the whole scrolling panel or tall element under the region"
+  },
+  "overlayScrollNothing": {
+    "message": "Nothing to scroll here: no scrolling panel and nothing taller than the window"
+  },
+  "overlayScrollTruncated": {
+    "message": "Too tall for one image — the first part was saved"
+  },
+  "overlayScrollCopiedTruncated": {
+    "message": "Too tall for one image — the first part was copied"
+  },
+  "overlayScrollPartial": {
+    "message": "Part of the area never came on screen, so the image has only what scrolling could reach"
+  },
+  "overlayScrollStopped": { "message": "Scrolling capture stopped" },
   "errorUnknown": { "message": "Unknown error" },
   "errorRestricted": { "message": "Chrome does not allow Region Snap to run on this page." },
   "errorNoTab": { "message": "No active tab was found." },
