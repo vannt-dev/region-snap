@@ -33,6 +33,21 @@
   "overlayToolArrow": { "message": "Vẽ mũi tên" },
   "overlayToolBox": { "message": "Vẽ khung" },
   "overlayToolHide": { "message": "Che một vùng" },
+  "overlayToolText": { "message": "Thêm chữ" },
+  "overlayToolStep": { "message": "Đánh số các bước" },
+  "overlayTextSize": {
+    "message": "Cỡ chữ: $SIZE$",
+    "placeholders": { "size": { "content": "$1" } }
+  },
+  "overlayTextSmall": { "message": "nhỏ" },
+  "overlayTextMedium": { "message": "vừa" },
+  "overlayTextLarge": { "message": "lớn" },
+  "overlayTextHint": {
+    "message": "Bấm để thêm chữ, hoặc bấm vào ghi chú để sửa; kéo ghi chú để di chuyển. Enter để giữ, Shift+Enter xuống dòng, Esc để hủy."
+  },
+  "overlayStepHint": {
+    "message": "Bấm để đặt các bước đánh số: 1, 2, 3… Hoàn tác sẽ bỏ bước cuối."
+  },
   "overlayUndo": { "message": "Bỏ nét vẽ gần nhất" },
   "overlayMarkHint": { "message": "Kéo trong vùng chọn để vẽ. Nhấn Esc để quay lại trang." },
   "overlaySelectHint": { "message": "Bấm vào phần tử hoặc kéo để chọn vùng" },

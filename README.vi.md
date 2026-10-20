@@ -22,6 +22,10 @@ bản nào không có ở đó thì không phải do vannt-dev phát hành.
   đã chọn công cụ, kéo trong vùng chọn để vẽ; nhấn `Esc` để bỏ công cụ và trang tương tác lại như
   thường. Nét vẽ được vẽ vào ảnh ở đúng độ phân giải của ảnh, và chi tiết trong vùng bị che không
   còn trong file đã lưu.
+- **Chữ** `T` thêm ghi chú: bấm trong vùng chọn rồi gõ; `Enter` để giữ, `Shift+Enter` xuống dòng,
+  `Esc` để hủy. Bấm vào ghi chú để sửa, kéo để di chuyển, và chọn cỡ nhỏ, vừa hoặc lớn bằng nút
+  `A`. **Bước** `①` đặt các vòng tròn đánh số 1, 2, 3… sau mỗi lần bấm; hoàn tác bỏ bước cuối và
+  lần bấm tiếp theo dùng lại số đó.
 - Nút **Sao chép** đưa PNG vào clipboard thay vì tải về; trang không dùng được clipboard (ví dụ
   `http://` thường) sẽ tự chuyển sang tải file.
 - **Chụp toàn trang** (popup, hoặc `Alt+Shift+F`) cuộn tài liệu từng khung nhìn một và ghép các
@@ -34,7 +38,7 @@ bản nào không có ở đó thì không phải do vannt-dev phát hành.
   tiền tố tên tệp, và đổi phím `Enter` cùng phím tắt sang sao chép thay vì tải về.
 - Khi nút di chuyển `⠿` đang được focus, dùng phím mũi tên để tinh chỉnh; giữ `Shift` để di chuyển 10 px.
 - Crop theo kích thước ảnh thật để hoạt động đúng với zoom và scale màn hình.
-- Xuất PNG bo góc 12 px với bốn góc trong suốt.
+- Mặc định lưu PNG bo góc 12 px với góc trong suốt; định dạng và bo góc đổi được trong cài đặt.
 - Giao diện mặc định bằng tiếng Anh; tự chuyển sang tiếng Việt theo ngôn ngữ Chrome.
 - Chỉ inject vào tab khi người dùng yêu cầu; extension không chạy thường trực trên mọi website.
 
@@ -88,7 +92,8 @@ Có thể thay đổi phím tắt tại `chrome://extensions/shortcuts`.
 
 - `activeTab`: chỉ truy cập tab hiện tại sau hành động trực tiếp của người dùng.
 - `scripting`: inject giao diện chọn vùng vào tab đang được kích hoạt.
-- `storage`: lưu bốn cài đặt trên chính thiết bị này. Không lưu gì khác.
+- `storage`: lưu các cài đặt (định dạng ảnh, bo góc, tiền tố tên tệp, thao tác mặc định và hẹn
+  giờ chụp) trên chính thiết bị này. Không lưu gì khác.
 
 Extension xử lý ảnh ngay trong trình duyệt và không gửi ảnh ra máy chủ.
 

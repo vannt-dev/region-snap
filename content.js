@@ -41,11 +41,18 @@
   let hasShownSelectHint = false;
   let hasShownLockedHint = false;
   let hasShownMarkHint = false;
-  // Arrows, boxes and hidden areas drawn over the locked region, in viewport coordinates.
+  const shownToolHints = new Set();
+  // Arrows, boxes, hidden areas, notes and steps over the locked region, in viewport coordinates.
   let marks = [];
   let activeTool = null;
   let markStart = null;
   let draftMark = null;
+  // The note under the pointer when the text tool went down on one: a drag moves it, a click
+  // edits it.
+  let textDrag = null;
+  // The note being typed: its textarea, where it sits, its size, and which mark it replaces.
+  let editor = null;
+  let textSize = "medium";
   // Set while a capture delay is counting down; calling it stops the countdown.
   let stopCountdown = null;
   let fullPageRun = null;
@@ -61,12 +68,28 @@
   let markSurface;
   let markSvg;
   let undoButton;
+  let textSizeButton;
   const handles = {};
 
   const SVG_NS = "http://www.w3.org/2000/svg";
-  const TOOL_GLYPHS = { arrow: "↗", box: "▢", hide: "▒" };
-  const TOOL_LABELS = { arrow: "overlayToolArrow", box: "overlayToolBox", hide: "overlayToolHide" };
-  const TOOLBAR_WIDTH = 440;
+  const TOOL_GLYPHS = { arrow: "↗", box: "▢", hide: "▒", text: "T", step: "①" };
+  const TOOL_LABELS = {
+    arrow: "overlayToolArrow",
+    box: "overlayToolBox",
+    hide: "overlayToolHide",
+    text: "overlayToolText",
+    step: "overlayToolStep",
+  };
+  const TOOL_HINTS = { text: "overlayTextHint", step: "overlayStepHint" };
+  const TEXT_SIZE_ORDER = ["small", "medium", "large"];
+  const TEXT_SIZE_LABELS = {
+    small: "overlayTextSmall",
+    medium: "overlayTextMedium",
+    large: "overlayTextLarge",
+  };
+  // A press that travels less than this is a click on a note, not a drag of it.
+  const CLICK_SLOP = 3;
+  const TOOLBAR_WIDTH = 540;
   const TOOLBAR_HEIGHT = 40;
   const CORNER_RADIUS = 12;
 
@@ -115,6 +138,7 @@
         (tool) =>
           `<button class="region-snap-tool" type="button" data-tool="${tool}" aria-pressed="false" title="${t(TOOL_LABELS[tool])}" aria-label="${t(TOOL_LABELS[tool])}">${TOOL_GLYPHS[tool]}</button>`,
       ).join("")}
+      <button class="region-snap-text-size" type="button" data-size="${textSize}">A</button>
       <button class="region-snap-undo" type="button" disabled title="${t("overlayUndo")}" aria-label="${t("overlayUndo")}">↶</button>
       <button class="region-snap-capture" type="button">${t("overlayCapture")}</button>
       <button class="region-snap-copy" type="button">${t("overlayCopy")}</button>
@@ -123,6 +147,8 @@
     gripButton = toolbar.querySelector(".region-snap-grip");
     sizeLabel = toolbar.querySelector(".region-snap-size");
     undoButton = toolbar.querySelector(".region-snap-undo");
+    textSizeButton = toolbar.querySelector(".region-snap-text-size");
+    labelTextSize();
 
     // The layer is the region's own box and clips what is drawn; the surface inside it is
     // shifted back so its coordinates are the viewport's, the same ones the marks use.
@@ -173,6 +199,11 @@
     undoButton.addEventListener("click", (event) => {
       if (event.isTrusted) undoMark();
     });
+    // Pressing the size button must not take the focus from a note being typed.
+    textSizeButton.addEventListener("mousedown", (event) => event.preventDefault());
+    textSizeButton.addEventListener("click", (event) => {
+      if (event.isTrusted) cycleTextSize();
+    });
     markLayer.addEventListener("mousedown", onMarkDown);
     gripButton.addEventListener("mousedown", onMoveGripDown);
     Object.values(handles).forEach((handle) => handle.addEventListener("mousedown", onHandleDown));
@@ -181,7 +212,9 @@
   function removeOverlay() {
     root?.remove();
     root = dim = border = toolbar = gripButton = sizeLabel = toast = null;
-    markLayer = markSurface = markSvg = undoButton = null;
+    markLayer = markSurface = markSvg = undoButton = textSizeButton = null;
+    editor = null;
+    textDrag = null;
     for (const position of Object.keys(handles)) delete handles[position];
   }
 
@@ -253,10 +286,27 @@
     if (!markSvg || !markSurface) return;
     const visible = draftMark ? [...marks, draftMark] : marks;
     markSvg.replaceChildren();
-    for (const element of markSurface.querySelectorAll(".region-snap-hide")) element.remove();
+    for (const element of markSurface.querySelectorAll(".region-snap-hide, .region-snap-text")) {
+      element.remove();
+    }
+    const steps = [];
 
     for (const mark of visible) {
-      if (mark.tool === "hide") {
+      // A note being edited shows as its textarea instead.
+      if (editor && mark === editor.original) continue;
+      if (mark.tool === "text") {
+        const note = document.createElement("div");
+        note.className = "region-snap-text";
+        note.dataset.index = String(marks.indexOf(mark));
+        note.textContent = mark.text;
+        note.style.setProperty("left", `${mark.x}px`, "important");
+        note.style.setProperty("top", `${mark.y}px`, "important");
+        note.style.setProperty("font", Annotations.textFont(mark.size), "important");
+        note.style.setProperty("line-height", String(Annotations.TEXT_LINE_HEIGHT), "important");
+        markSurface.appendChild(note);
+      } else if (mark.tool === "step") {
+        steps.push(mark);
+      } else if (mark.tool === "hide") {
         const cover = document.createElement("div");
         cover.className = "region-snap-hide";
         cover.style.setProperty("left", `${mark.left}px`, "important");
@@ -292,25 +342,134 @@
         );
       }
     }
+    // Steps sit on top of the lines and boxes, as they do in the image.
+    for (const mark of steps) {
+      markSvg.append(
+        svgElement("circle", { cx: mark.x, cy: mark.y, r: Annotations.STEP_RADIUS }),
+        Object.assign(svgElement("text", { x: mark.x, y: mark.y }), {
+          textContent: String(mark.number),
+        }),
+      );
+    }
+    if (editor) markSurface.appendChild(editor.element);
     if (undoButton) undoButton.disabled = marks.length === 0;
+  }
+
+  function labelTextSize() {
+    if (!textSizeButton) return;
+    const size = editor?.size || textSize;
+    const label = t("overlayTextSize", [t(TEXT_SIZE_LABELS[size])]);
+    textSizeButton.dataset.size = size;
+    textSizeButton.title = label;
+    textSizeButton.setAttribute("aria-label", label);
+  }
+
+  // Small, medium, large, and round again. It sets the size of the note being typed and of
+  // the notes that follow.
+  function cycleTextSize() {
+    const current = editor?.size || textSize;
+    textSize = TEXT_SIZE_ORDER[(TEXT_SIZE_ORDER.indexOf(current) + 1) % TEXT_SIZE_ORDER.length];
+    if (editor) {
+      editor.size = textSize;
+      styleEditor();
+      editor.element.focus({ preventScroll: true });
+    }
+    labelTextSize();
+  }
+
+  function styleEditor() {
+    if (!editor) return;
+    const { element, point, size } = editor;
+    element.style.setProperty("left", `${point.x}px`, "important");
+    element.style.setProperty("top", `${point.y}px`, "important");
+    element.style.setProperty("font", Annotations.textFont(size), "important");
+    element.style.setProperty("line-height", String(Annotations.TEXT_LINE_HEIGHT), "important");
+    fitEditor();
+  }
+
+  // Grows the textarea with what is typed. `field-sizing: content` does it in current Chrome;
+  // rows and columns cover older versions without reading layout.
+  function fitEditor() {
+    if (!editor) return;
+    const lines = editor.element.value.split("\n");
+    editor.element.rows = Math.max(1, lines.length);
+    editor.element.cols = Math.max(4, ...lines.map((line) => line.length + 1));
+  }
+
+  // Opens a textarea for a new note at `point`, or over an existing note to change it.
+  function openEditor(point, original = null) {
+    commitEditor();
+    if (!markSurface) return;
+    const element = document.createElement("textarea");
+    element.className = "region-snap-text-editor";
+    element.wrap = "off";
+    element.spellcheck = false;
+    element.setAttribute("aria-label", t("overlayToolText"));
+    element.value = original?.text || "";
+    editor = { element, point: { ...point }, size: original?.size || textSize, original };
+    // Keys typed into the note are not the page's business.
+    for (const type of ["keyup", "keypress"]) {
+      element.addEventListener(type, (event) => event.stopPropagation());
+    }
+    element.addEventListener("input", fitEditor);
+    element.addEventListener("blur", () => commitEditor());
+    styleEditor();
+    labelTextSize();
+    renderMarks();
+    element.focus({ preventScroll: true });
+    element.setSelectionRange(element.value.length, element.value.length);
+  }
+
+  // Keeps what was typed. A note emptied out is removed; a new one left empty is dropped.
+  function commitEditor() {
+    if (!editor) return;
+    const { element, point, size, original } = editor;
+    editor = null;
+    const mark = rect ? Annotations.createTextMark(point, element.value, size, rect) : null;
+    const index = original ? marks.indexOf(original) : -1;
+    if (index >= 0) {
+      marks = mark
+        ? marks.map((item, position) => (position === index ? mark : item))
+        : marks.filter((_item, position) => position !== index);
+    } else if (mark) {
+      marks = [...marks, mark];
+    }
+    element.remove();
+    labelTextSize();
+    renderMarks();
+  }
+
+  // Throws away what was typed; a note that was being changed keeps its old text.
+  function cancelEditor() {
+    if (!editor) return;
+    const { element } = editor;
+    editor = null;
+    element.remove();
+    labelTextSize();
+    renderMarks();
   }
 
   // With a tool chosen the region takes the pointer so a drag draws; with none it lets the
   // page through again, which is what a locked region normally does.
   function setTool(tool) {
     activeTool = Annotations.TOOLS.includes(tool) ? tool : null;
+    if (activeTool !== "text") commitEditor();
     if (!root) return;
     root.dataset.tool = activeTool || "none";
     for (const button of toolbar.querySelectorAll(".region-snap-tool")) {
       button.setAttribute("aria-pressed", String(button.dataset.tool === activeTool));
     }
-    if (activeTool && !hasShownMarkHint) {
+    if (TOOL_HINTS[activeTool]) {
+      if (!shownToolHints.has(activeTool)) showToast(t(TOOL_HINTS[activeTool]));
+      shownToolHints.add(activeTool);
+    } else if (activeTool && !hasShownMarkHint) {
       showToast(t("overlayMarkHint"));
       hasShownMarkHint = true;
     }
   }
 
   function undoMark() {
+    commitEditor();
     if (!marks.length) return;
     marks = marks.slice(0, -1);
     renderMarks();
@@ -326,17 +485,49 @@
       capturing
     )
       return;
+    // A press inside the note being typed belongs to the textarea: it moves the caret.
+    if (editor && event.target === editor.element) return;
     stopPageEvent(event);
     markStart = { x: event.clientX, y: event.clientY };
     draftMark = null;
+    textDrag = null;
+    if (activeTool === "text") {
+      const index = Number(event.target.closest?.(".region-snap-text")?.dataset.index ?? -1);
+      const note = marks[index]?.tool === "text" ? marks[index] : null;
+      commitEditor();
+      if (note) textDrag = { mark: note, from: { x: note.x, y: note.y }, moved: false };
+    }
     root.dataset.interacting = "true";
     document.addEventListener("mousemove", onMarkMove, true);
     document.addEventListener("mouseup", onMarkUp, true);
   }
 
+  // Moves the note held by the text tool, keeping its corner inside the region.
+  function dragNote(event) {
+    const dx = event.clientX - markStart.x;
+    const dy = event.clientY - markStart.y;
+    if (!textDrag.moved && Math.hypot(dx, dy) < CLICK_SLOP) return;
+    textDrag.moved = true;
+    const { mark } = textDrag;
+    const moved = Annotations.createTextMark(
+      { x: textDrag.from.x + dx, y: textDrag.from.y + dy },
+      mark.text,
+      mark.size,
+      rect,
+    );
+    if (!moved) return;
+    marks = marks.map((item) => (item === mark ? moved : item));
+    textDrag.mark = moved;
+    renderMarks();
+  }
+
   function onMarkMove(event) {
     if (!event.isTrusted || !markStart || !rect) return;
     stopPageEvent(event);
+    if (Annotations.CLICK_TOOLS.includes(activeTool)) {
+      if (textDrag) dragNote(event);
+      return;
+    }
     draftMark = Annotations.createMark(
       activeTool,
       markStart,
@@ -349,6 +540,10 @@
   function onMarkUp(event) {
     if (event && !event.isTrusted) return;
     if (event) stopPageEvent(event);
+    if (event && markStart && rect && Annotations.CLICK_TOOLS.includes(activeTool)) {
+      finishClickTool();
+      return;
+    }
     const mark =
       event && markStart && rect
         ? Annotations.createMark(
@@ -365,6 +560,34 @@
     document.removeEventListener("mousemove", onMarkMove, true);
     document.removeEventListener("mouseup", onMarkUp, true);
     renderMarks();
+  }
+
+  function endMarkPress() {
+    markStart = null;
+    draftMark = null;
+    textDrag = null;
+    if (root) root.dataset.interacting = "false";
+    document.removeEventListener("mousemove", onMarkMove, true);
+    document.removeEventListener("mouseup", onMarkUp, true);
+  }
+
+  // A click with the step tool drops the next number where the press started; with the text
+  // tool it opens a note there, or on the note clicked. A note that was dragged is already moved.
+  function finishClickTool() {
+    const point = markStart;
+    const drag = textDrag;
+    endMarkPress();
+    if (activeTool === "step") {
+      const step = Annotations.createStepMark(point, marks, rect);
+      if (step) marks = [...marks, step];
+      renderMarks();
+    } else if (drag?.moved) {
+      renderMarks();
+    } else if (drag) {
+      openEditor({ x: drag.mark.x, y: drag.mark.y }, drag.mark);
+    } else {
+      openEditor(point);
+    }
   }
 
   function showToast(message, kind = "info") {
@@ -606,8 +829,25 @@
     return true;
   }
 
+  // While a note is typed, Escape throws it away and Enter keeps it (Shift+Enter starts a new
+  // line). No key reaches the page, and Ctrl+Z is the textarea's own undo.
+  function onEditorKeyDown(event) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      cancelEditor();
+    } else if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+      event.preventDefault();
+      commitEditor();
+    }
+    event.stopImmediatePropagation();
+  }
+
   function onKeyDown(event) {
     if (!event.isTrusted) return;
+    if (editor && event.target === editor.element) {
+      onEditorKeyDown(event);
+      return;
+    }
     if (event.key === "Escape") {
       event.preventDefault();
       // Escape first stops a countdown, then puts the drawing tool down; the region is
@@ -694,6 +934,8 @@
     activeTool = null;
     markStart = null;
     draftMark = null;
+    textDrag = null;
+    editor = null;
     removeOverlay();
   }
 
@@ -888,6 +1130,8 @@
 
     capturing = true;
     const captureSession = sessionId;
+    // A note still being typed goes into the image as it stands.
+    commitEditor();
 
     try {
       const stored = await loadSettings();

@@ -1,7 +1,10 @@
 /*! SPDX-License-Identifier: MIT | Copyright (c) 2026 vannt-dev | github.com/vannt-dev/region-snap */
 ((scope) => {
-  const TOOLS = Object.freeze(["arrow", "box", "hide"]);
+  const TOOLS = Object.freeze(["arrow", "box", "hide", "text", "step"]);
+  // Placed with a click instead of drawn with a drag.
+  const CLICK_TOOLS = Object.freeze(["text", "step"]);
   const MARK_COLOR = "#ef4444";
+  const HALO_COLOR = "#ffffff";
   const LINE_WIDTH = 3;
   const ARROW_HEAD = 14;
   const BOX_RADIUS = 4;
@@ -9,14 +12,71 @@
   // Side of one mosaic block in CSS pixels: about the height of body text, so the letters of a
   // hidden line average into blocks instead of staying legible.
   const HIDE_BLOCK = 14;
+  // Text sizes in CSS pixels; the overlay and the image use the same font and line height.
+  const TEXT_SIZES = Object.freeze({ small: 14, medium: 20, large: 28 });
+  const TEXT_LINE_HEIGHT = 1.25;
+  const TEXT_WEIGHT = 600;
+  const TEXT_FONT_FAMILY = '"Segoe UI", system-ui, -apple-system, Roboto, sans-serif';
+  const TEXT_HALO = 3;
+  const STEP_RADIUS = 13;
+  const STEP_FONT_SIZE = 14;
+  const STEP_BORDER = 2;
 
   const clamp = (value, min, max) => Math.min(Math.max(value, min), Math.max(min, max));
+
+  function textFont(size, scale = 1) {
+    const pixels = (TEXT_SIZES[size] || TEXT_SIZES.medium) * scale;
+    return `${TEXT_WEIGHT} ${pixels}px ${TEXT_FONT_FAMILY}`;
+  }
+
+  function stepFont(scale = 1) {
+    return `700 ${STEP_FONT_SIZE * scale}px ${TEXT_FONT_FAMILY}`;
+  }
+
+  // A text mark is anchored at its top-left corner, which is kept inside the region; the text
+  // itself may run past the edge, where the capture cuts it like anything else. Blank text is
+  // no mark, so committing an emptied note removes it.
+  function createTextMark(point, text, size, bounds) {
+    if (!point || !bounds || typeof text !== "string") return null;
+    const value = text.replace(/\r\n?/g, "\n");
+    if (!value.trim()) return null;
+    return {
+      tool: "text",
+      x: clamp(point.x, bounds.left, bounds.left + bounds.width),
+      y: clamp(point.y, bounds.top, bounds.top + bounds.height),
+      text: value,
+      size: Object.hasOwn(TEXT_SIZES, size) ? size : "medium",
+    };
+  }
+
+  // The next step is one more than the highest step still there, so removing the last step
+  // with undo hands its number to the next one.
+  function nextStepNumber(marks) {
+    let highest = 0;
+    for (const mark of marks || []) {
+      if (mark?.tool === "step" && mark.number > highest) highest = mark.number;
+    }
+    return highest + 1;
+  }
+
+  // A step is a numbered circle centred on the click, moved in so the whole circle shows.
+  function createStepMark(point, marks, bounds) {
+    if (!point || !bounds) return null;
+    return {
+      tool: "step",
+      x: clamp(point.x, bounds.left + STEP_RADIUS, bounds.left + bounds.width - STEP_RADIUS),
+      y: clamp(point.y, bounds.top + STEP_RADIUS, bounds.top + bounds.height - STEP_RADIUS),
+      number: nextStepNumber(marks),
+    };
+  }
 
   // Marks live in viewport coordinates, like the region itself: moving or resizing the region
   // leaves them on the content they were drawn over. `bounds` is the region; a mark is kept
   // inside it, and one too small to be deliberate is dropped.
   function createMark(tool, start, end, bounds) {
-    if (!TOOLS.includes(tool) || !start || !end || !bounds) return null;
+    if (!TOOLS.includes(tool) || CLICK_TOOLS.includes(tool) || !start || !end || !bounds) {
+      return null;
+    }
     const right = bounds.left + bounds.width;
     const bottom = bounds.top + bounds.height;
     const from = {
@@ -60,6 +120,13 @@
 
   // Converts a mark from viewport coordinates to the pixels of the cropped image.
   function toOutput(mark, origin, scale) {
+    if (mark.tool === "text" || mark.tool === "step") {
+      return {
+        ...mark,
+        x: (mark.x - origin.left) * scale.x,
+        y: (mark.y - origin.top) * scale.y,
+      };
+    }
     if (mark.tool === "arrow") {
       return {
         tool: mark.tool,
@@ -158,6 +225,43 @@
     context.stroke();
   }
 
+  // Text is drawn line by line with a light outline under it, so it reads on dark and light
+  // content alike. The first line sits where the overlay's CSS line box puts it.
+  function drawText(context, mark, scale) {
+    const size = (TEXT_SIZES[mark.size] || TEXT_SIZES.medium) * scale;
+    const lineHeight = size * TEXT_LINE_HEIGHT;
+    const top = mark.y + (lineHeight - size) / 2;
+    const lines = String(mark.text).split("\n");
+    context.save();
+    context.font = textFont(mark.size, scale);
+    context.textAlign = "left";
+    context.textBaseline = "top";
+    context.lineJoin = "round";
+    context.lineWidth = TEXT_HALO * scale;
+    context.strokeStyle = HALO_COLOR;
+    context.fillStyle = MARK_COLOR;
+    lines.forEach((line, index) => context.strokeText(line, mark.x, top + index * lineHeight));
+    lines.forEach((line, index) => context.fillText(line, mark.x, top + index * lineHeight));
+    context.restore();
+  }
+
+  function drawStep(context, mark, scale) {
+    context.save();
+    context.beginPath();
+    context.arc(mark.x, mark.y, STEP_RADIUS * scale, 0, Math.PI * 2);
+    context.fillStyle = MARK_COLOR;
+    context.fill();
+    context.lineWidth = STEP_BORDER * scale;
+    context.strokeStyle = HALO_COLOR;
+    context.stroke();
+    context.font = stepFont(scale);
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillStyle = HALO_COLOR;
+    context.fillText(String(mark.number), mark.x, mark.y);
+    context.restore();
+  }
+
   // Draws every mark onto the cropped image. `origin` is the region's corner in the viewport
   // and `scale` the image pixels per CSS pixel. Hidden areas go first, so an arrow or a box
   // drawn across one stays sharp on top of it.
@@ -183,20 +287,38 @@
       if (mark.tool === "box") drawBox(context, mark, unit);
     }
     context.restore();
+    // Notes and steps go last: they label what the other marks point at.
+    for (const mark of output) {
+      if (mark.tool === "text") drawText(context, mark, unit);
+      if (mark.tool === "step") drawStep(context, mark, unit);
+    }
   }
 
   const api = Object.freeze({
     ARROW_HEAD,
     BOX_RADIUS,
+    CLICK_TOOLS,
+    HALO_COLOR,
     HIDE_BLOCK,
     LINE_WIDTH,
     MARK_COLOR,
     MIN_MARK_SIZE,
+    STEP_FONT_SIZE,
+    STEP_RADIUS,
+    TEXT_FONT_FAMILY,
+    TEXT_LINE_HEIGHT,
+    TEXT_SIZES,
+    TEXT_WEIGHT,
     TOOLS,
     arrowHead,
     createMark,
+    createStepMark,
+    createTextMark,
     drawMarks,
     hideArea,
+    nextStepNumber,
+    stepFont,
+    textFont,
     toOutput,
   });
 

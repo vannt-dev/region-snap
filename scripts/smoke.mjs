@@ -272,6 +272,132 @@ try {
   assert.equal(await targetPage.locator(".region-snap-mark-svg > *").count(), 0);
   assert.equal(await targetPage.locator(".region-snap-hide").count(), 0);
 
+  // Numbered steps: each click drops the next number, and after an undo the numbering carries
+  // on from the steps that are left.
+  const click = (point) => targetPage.mouse.click(point.x, point.y);
+  const stepNumbers = () => targetPage.locator(".region-snap-mark-svg text").allTextContents();
+  await tool("step").click();
+  for (const fx of [0.15, 0.3, 0.45]) await click(at(fx, 0.3));
+  assert.deepEqual(await stepNumbers(), ["1", "2", "3"]);
+  await targetPage.locator(".region-snap-undo").click();
+  assert.deepEqual(await stepNumbers(), ["1", "2"]);
+  await click(at(0.6, 0.3));
+  assert.deepEqual(await stepNumbers(), ["1", "2", "3"], "undo hands the last number back");
+
+  // Text: a click opens a note, Escape drops it, Enter keeps it, Shift+Enter adds a line, and
+  // none of the typing reaches the page.
+  await targetPage.evaluate(() => {
+    globalThis.__pageKeys = 0;
+    globalThis.addEventListener("keydown", () => (globalThis.__pageKeys += 1));
+  });
+  await tool("text").click();
+  const editorBox = targetPage.locator(".region-snap-text-editor");
+  const notes = targetPage.locator(".region-snap-text");
+  await click(at(0.1, 0.6));
+  await editorBox.waitFor();
+  await targetPage.keyboard.type("Draft");
+  await targetPage.keyboard.press("Escape");
+  assert.equal(await editorBox.count(), 0, "Escape closes the note");
+  assert.equal(await notes.count(), 0, "a cancelled note is not kept");
+  assert.equal(await root.getAttribute("data-tool"), "text", "Escape only cancels the typing");
+  assert.equal(await root.getAttribute("data-mode"), "locked");
+
+  await targetPage.locator(".region-snap-text-size").click();
+  assert.equal(
+    await targetPage.locator(".region-snap-text-size").getAttribute("data-size"),
+    "large",
+  );
+  await click(at(0.1, 0.6));
+  await editorBox.waitFor();
+  await targetPage.keyboard.type("Hello");
+  await targetPage.keyboard.press("Shift+Enter");
+  await targetPage.keyboard.type("World");
+  await targetPage.keyboard.press("Enter");
+  assert.equal(await editorBox.count(), 0, "Enter keeps the note");
+  assert.deepEqual(await notes.allTextContents(), ["Hello\nWorld"]);
+  assert.match(await notes.getAttribute("style"), /28px/, "the note has the large size");
+  assert.equal(await targetPage.evaluate(() => globalThis.__pageKeys), 0, "typing stays out");
+
+  const noteBefore = await notes.boundingBox();
+  await drag(
+    { x: noteBefore.x + 5, y: noteBefore.y + 5 },
+    { x: noteBefore.x + 35, y: noteBefore.y + 15 },
+  );
+  const noteAfter = await notes.boundingBox();
+  assert.ok(Math.abs(noteAfter.x - noteBefore.x - 30) < 1, "a dragged note moves");
+  assert.ok(Math.abs(noteAfter.y - noteBefore.y - 10) < 1);
+  assert.equal(await editorBox.count(), 0, "a drag does not open the note");
+  await click({ x: noteAfter.x + 5, y: noteAfter.y + 5 });
+  await editorBox.waitFor();
+  assert.equal(await editorBox.inputValue(), "Hello\nWorld");
+  await targetPage.keyboard.type("!");
+  await targetPage.keyboard.press("Enter");
+  assert.deepEqual(await notes.allTextContents(), ["Hello\nWorld!"], "a click edits the note");
+
+  // The note and the steps are drawn into the image at its own resolution.
+  await evaluateIsolated(`(() => {
+    const canvas = globalThis.document.createElement("canvas");
+    canvas.width = ${viewport.width};
+    canvas.height = ${viewport.height};
+    const context = canvas.getContext("2d");
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    globalThis.__captureDataUrl = canvas.toDataURL("image/png");
+  })()`);
+  const noteBox = await notes.boundingBox();
+  const annotatedPromise = targetPage.waitForEvent("download");
+  await targetPage.locator(".region-snap-capture").click();
+  const annotated = await annotatedPromise;
+  const annotatedBase64 = (await fs.readFile(await annotated.path())).toString("base64");
+  await evaluateIsolated("globalThis.__captureDataUrl = null");
+  const stepCentre = await targetPage
+    .locator(".region-snap-mark-svg circle")
+    .first()
+    .evaluate((circle) => {
+      const bounds = circle.getBoundingClientRect();
+      return { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+    });
+  const annotatedPixels = await targetPage.evaluate(
+    async ({ base64, origin, step, note }) => {
+      const blob = await (await globalThis.fetch(`data:image/png;base64,${base64}`)).blob();
+      const bitmap = await globalThis.createImageBitmap(blob);
+      const canvas = globalThis.document.createElement("canvas");
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      const context = canvas.getContext("2d");
+      context.drawImage(bitmap, 0, 0);
+      const pixel = (x, y) =>
+        Array.from(
+          context.getImageData(Math.round(x - origin.x), Math.round(y - origin.y), 1, 1).data,
+        );
+      const area = context.getImageData(
+        Math.round(note.x - origin.x),
+        Math.round(note.y - origin.y),
+        Math.round(note.width),
+        Math.round(note.height),
+      ).data;
+      let red = 0;
+      for (let index = 0; index < area.length; index += 4) {
+        if (area[index] > 200 && area[index + 1] < 120 && area[index + 2] < 120) red += 1;
+      }
+      return { stepRing: pixel(step.x + 8, step.y), stepOutside: pixel(step.x + 20, step.y), red };
+    },
+    {
+      base64: annotatedBase64,
+      origin: { x: region.x, y: region.y },
+      step: stepCentre,
+      note: noteBox,
+    },
+  );
+  assert.deepEqual(annotatedPixels.stepRing, [239, 68, 68, 255], "the step circle is in the image");
+  assert.deepEqual(annotatedPixels.stepOutside, [255, 255, 255, 255], "a step is a small circle");
+  assert.ok(annotatedPixels.red > 50, `the note is in the image, ${annotatedPixels.red} red px`);
+
+  await targetPage.keyboard.press("Escape");
+  assert.equal(await root.getAttribute("data-tool"), "none");
+  for (let left = 4; left > 0; left -= 1) await targetPage.locator(".region-snap-undo").click();
+  assert.equal(await targetPage.locator(".region-snap-undo").isDisabled(), true);
+
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   const downloadsBeforeCopy = downloadCount;
   await targetPage.locator(".region-snap-copy").click();
@@ -477,6 +603,8 @@ try {
   const optionsErrors = [];
   options.on("pageerror", (error) => optionsErrors.push(error.message));
   await options.goto(`chrome-extension://${extensionId}/options.html`);
+  // The form is filled once the stored settings are read; the example name shows it is done.
+  await options.locator("#file-name-example", { hasText: /\S/ }).waitFor();
   assert.equal(await options.locator('input[name="format"][value="png"]').isChecked(), true);
   await options.locator('input[name="format"][value="webp"]').check();
   await options.locator('input[name="roundedCorners"]').uncheck();
