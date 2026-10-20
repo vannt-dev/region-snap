@@ -599,6 +599,253 @@ try {
   );
   await targetPage.locator("#region-snap-root").waitFor({ state: "detached", timeout: 6000 });
 
+  // Scrolling capture. With nothing that scrolls under the region it says so and does nothing.
+  const startPicking = () =>
+    evaluateIsolated(
+      `new Promise((resolve) =>
+        globalThis.__regionSnapListener({ type: "START_PICKING" }, {}, resolve)
+      )`,
+      true,
+    );
+  await targetPage.evaluate(() => globalThis.scrollTo(0, 0));
+  await startPicking();
+  await targetPage.locator("#target").click({ position: { x: 200, y: 120 } });
+  await targetPage.locator('#region-snap-root[data-mode="locked"]').waitFor();
+  const downloadsBeforeNothing = downloadCount;
+  await targetPage.locator(".region-snap-scroll").click();
+  await targetPage.locator(".region-snap-toast", { hasText: "overlayScrollNothing" }).waitFor();
+  assert.equal(downloadCount, downloadsBeforeNothing);
+
+  // Each stub screenshot is filled with a colour that encodes the scroll offset it was taken
+  // at, read from the panel or from the page, and notes what the page looked like.
+  const encodeScroll = (source) => `
+    globalThis.__captureLog = [];
+    globalThis.__captureFactory = () => {
+      const { document } = globalThis;
+      const style = (id) => globalThis.getComputedStyle(document.getElementById(id));
+      const top = Math.round(${source});
+      globalThis.__captureLog.push({
+        top,
+        header: style("smoke-header").visibility,
+        sticky: style("smoke-sticky").position,
+        panelHead: document.getElementById("smoke-panel-head")
+          ? style("smoke-panel-head").position
+          : null,
+        overlay: globalThis.getComputedStyle(document.getElementById("region-snap-root")).opacity,
+        at: Date.now(),
+      });
+      const canvas = document.createElement("canvas");
+      canvas.width = globalThis.innerWidth;
+      canvas.height = globalThis.innerHeight;
+      const context = canvas.getContext("2d");
+      context.fillStyle = "rgb(" + (top >> 8) + "," + (top & 255) + ",100)";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      return canvas.toDataURL("image/png");
+    };
+  `;
+  const plannedPositions = (start, end, windowHeight, maxScroll) => {
+    const result = [];
+    for (let top = Math.min(start, maxScroll); ; top = Math.min(top + windowHeight, maxScroll)) {
+      if (result.at(-1) === top) break;
+      result.push(top);
+      if (top + windowHeight >= end) break;
+    }
+    return result;
+  };
+  const readRows = (base64, x, rows) =>
+    targetPage.evaluate(
+      async ({ data, column, ys }) => {
+        const blob = await (await globalThis.fetch(`data:image/png;base64,${data}`)).blob();
+        const bitmap = await globalThis.createImageBitmap(blob);
+        const canvas = globalThis.document.createElement("canvas");
+        canvas.width = bitmap.width;
+        canvas.height = bitmap.height;
+        const context = canvas.getContext("2d");
+        context.drawImage(bitmap, 0, 0);
+        return {
+          width: bitmap.width,
+          height: bitmap.height,
+          rows: ys.map((y) => Array.from(context.getImageData(column, y, 1, 1).data)),
+        };
+      },
+      { data: base64, column: x, ys: rows },
+    );
+  const readLog = async () =>
+    JSON.parse((await evaluateIsolated("JSON.stringify(globalThis.__captureLog)")).result.value);
+  const assertPaced = (log) => {
+    for (let index = 1; index < log.length; index += 1) {
+      const gap = log[index].at - log[index - 1].at;
+      assert.ok(gap >= 550, `slices must respect Chrome's capture quota, gap was ${gap} ms`);
+    }
+  };
+
+  // (a) A panel that scrolls inside the page, with a sticky heading of its own.
+  const panelMetrics = await targetPage.evaluate(() => {
+    const { document } = globalThis;
+    const panel = document.createElement("div");
+    panel.id = "smoke-panel";
+    panel.style.cssText = "height: 200px; width: 300px; overflow: auto; background: #fff";
+    panel.innerHTML =
+      '<div id="smoke-panel-head" style="position: sticky; top: 0; height: 20px"></div>' +
+      '<div id="smoke-panel-body" style="height: 1000px"></div>';
+    document.getElementById("target").after(panel);
+    panel.scrollTo({ top: 120, behavior: "instant" });
+    panel.style.scrollBehavior = "smooth";
+    const bounds = panel.getBoundingClientRect();
+    return {
+      x: bounds.x,
+      y: bounds.y,
+      scrollHeight: panel.scrollHeight,
+      clientHeight: panel.clientHeight,
+      clientWidth: panel.clientWidth,
+    };
+  });
+  await startPicking();
+  await targetPage.mouse.click(panelMetrics.x + 100, panelMetrics.y + 100);
+  await targetPage.locator('#region-snap-root[data-mode="locked"]').waitFor();
+  await evaluateIsolated(encodeScroll('document.getElementById("smoke-panel").scrollTop'));
+  const panelPromise = targetPage.waitForEvent("download");
+  await targetPage.locator(".region-snap-scroll").click();
+  const panelBase64 = (await fs.readFile(await (await panelPromise).path())).toString("base64");
+  await targetPage.locator(".region-snap-toast", { hasText: "overlaySaved" }).waitFor();
+  const panelLog = await readLog();
+  const panelPositions = plannedPositions(
+    0,
+    panelMetrics.scrollHeight,
+    panelMetrics.clientHeight,
+    panelMetrics.scrollHeight - panelMetrics.clientHeight,
+  );
+  assert.deepEqual(
+    panelLog.map((entry) => entry.top),
+    panelPositions,
+    "one screenshot per panel height, the last flush with the panel's end",
+  );
+  assert.ok(
+    panelLog.every((entry) => entry.panelHead === "relative" && entry.overlay === "0"),
+    "the panel's sticky heading sits in the flow and the overlay is hidden",
+  );
+  assert.ok(
+    panelLog.every((entry) => entry.header === "hidden"),
+    "fixed elements outside the panel stay out of every slice",
+  );
+  assertPaced(panelLog);
+  const lastPanel = panelPositions.at(-1);
+  const panelImage = await readRows(panelBase64, 10, [
+    5,
+    panelMetrics.clientHeight + 5,
+    lastPanel - 5,
+    panelMetrics.scrollHeight - 5,
+  ]);
+  assert.equal(panelImage.width, panelMetrics.clientWidth, "the panel's scrollbar is left out");
+  assert.equal(panelImage.height, panelMetrics.scrollHeight, "the whole panel content is there");
+  assert.deepEqual(panelImage.rows, [
+    sliceColour(panelPositions[0]),
+    sliceColour(panelPositions[1]),
+    sliceColour(panelPositions.at(-2)),
+    sliceColour(lastPanel),
+  ]);
+  assert.deepEqual(
+    await targetPage.evaluate(() => {
+      const { document } = globalThis;
+      return {
+        panel: document.getElementById("smoke-panel").scrollTop,
+        page: globalThis.scrollY,
+        head: globalThis.getComputedStyle(document.getElementById("smoke-panel-head")).position,
+        header: globalThis.getComputedStyle(document.getElementById("smoke-header")).visibility,
+      };
+    }),
+    { panel: 120, page: 0, head: "sticky", header: "visible" },
+    "the panel and the page are put back as they were",
+  );
+  assert.equal(await root.getAttribute("data-mode"), "locked", "the region stays locked");
+
+  // Escape stops a scrolling capture part way: nothing is saved, the region stays, and the
+  // panel is scrolled back.
+  await evaluateIsolated(encodeScroll('document.getElementById("smoke-panel").scrollTop'));
+  const downloadsBeforeStop = downloadCount;
+  await targetPage.locator(".region-snap-scroll").click();
+  await evaluateIsolated(
+    `new Promise((resolve, reject) => {
+      const deadline = Date.now() + 5000;
+      const poll = () => {
+        if (globalThis.__captureLog.length > 0) return resolve();
+        if (Date.now() >= deadline) return reject(new Error("the scrolling capture did not start"));
+        globalThis.setTimeout(poll, 10);
+      };
+      poll();
+    })`,
+    true,
+  );
+  await targetPage.keyboard.press("Escape");
+  await targetPage.locator(".region-snap-toast", { hasText: "overlayScrollStopped" }).waitFor();
+  await targetPage.waitForTimeout(700);
+  assert.equal(downloadCount, downloadsBeforeStop, "a stopped scrolling capture saves nothing");
+  assert.equal(await root.getAttribute("data-mode"), "locked", "Escape only stops the capture");
+  assert.equal(
+    await targetPage.evaluate(() => globalThis.document.getElementById("smoke-panel").scrollTop),
+    120,
+  );
+
+  // (b) An element taller than the window, scrolled by the page itself.
+  const tallMetrics = await targetPage.evaluate(() => {
+    const { document } = globalThis;
+    const tall = document.getElementById("smoke-tall");
+    tall.style.background = "#ddd";
+    const top = tall.getBoundingClientRect().top + globalThis.scrollY;
+    globalThis.scrollTo(0, top - 200);
+    const page = document.documentElement;
+    return {
+      top,
+      height: tall.getBoundingClientRect().height,
+      scrollY: globalThis.scrollY,
+      viewport: page.clientHeight,
+      maxScroll: page.scrollHeight - page.clientHeight,
+    };
+  });
+  await startPicking();
+  await targetPage.mouse.click(400, 450);
+  await targetPage.locator('#region-snap-root[data-mode="locked"]').waitFor();
+  await targetPage.locator(".region-snap-border").waitFor();
+  const tallRegion = await targetPage.locator(".region-snap-border").boundingBox();
+  await evaluateIsolated(encodeScroll("globalThis.scrollY"));
+  const tallPromise = targetPage.waitForEvent("download");
+  await targetPage.locator(".region-snap-scroll").click();
+  const tallBase64 = (await fs.readFile(await (await tallPromise).path())).toString("base64");
+  await targetPage.locator(".region-snap-toast", { hasText: "overlaySaved" }).waitFor();
+  const tallLog = await readLog();
+  await evaluateIsolated("globalThis.__captureFactory = null");
+  const tallPositions = plannedPositions(
+    tallMetrics.top,
+    tallMetrics.top + tallMetrics.height,
+    tallMetrics.viewport,
+    tallMetrics.maxScroll,
+  ).map(Math.round);
+  assert.deepEqual(
+    tallLog.map((entry) => entry.top),
+    tallPositions,
+  );
+  assert.ok(
+    tallLog.every(
+      (entry) => entry.sticky === "relative" && entry.header === "hidden" && entry.overlay === "0",
+    ),
+    "sticky elements sit in the flow and fixed ones stay out while the page scrolls",
+  );
+  assertPaced(tallLog);
+  const tallImage = await readRows(tallBase64, 10, [5, tallMetrics.height - 5]);
+  assert.equal(tallImage.width, Math.round(tallRegion.width));
+  assert.equal(tallImage.height, tallMetrics.height, "the element's full height is there");
+  assert.deepEqual(tallImage.rows, [
+    sliceColour(tallPositions[0]),
+    sliceColour(tallPositions.at(-1)),
+  ]);
+  assert.equal(
+    await targetPage.evaluate(() => globalThis.scrollY),
+    tallMetrics.scrollY,
+    "the page is scrolled back",
+  );
+  await targetPage.keyboard.press("Escape");
+  await targetPage.locator("#region-snap-root").waitFor({ state: "detached" });
+
   const options = await context.newPage();
   const optionsErrors = [];
   options.on("pageerror", (error) => optionsErrors.push(error.message));
@@ -645,7 +892,7 @@ try {
   assert.equal(version, manifest.version);
   assert.deepEqual(pageErrors, []);
   console.log(
-    `Smoke test passed for selection, marks, capture, delay, full page, and popup v${version}.`,
+    `Smoke test passed for selection, marks, capture, delay, full page, scrolling capture, and popup v${version}.`,
   );
 } finally {
   await context.close();

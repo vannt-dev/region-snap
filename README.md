@@ -34,6 +34,13 @@ anything else is not published by vannt-dev.
   stitches the slices into one image, without the scrollbar. A fixed header is kept in the first
   slice and a fixed footer in the last instead of repeating down the image; sticky elements sit
   where they are in the flow. The page is scrolled back when it is done, and `Esc` stops it.
+- **Capture a scrolling area** `⇣` (toolbar) photographs everything a panel that scrolls on its
+  own holds, when the locked region sits in one (chat threads, mail lists, side panels), or an
+  element taller than the window. It scrolls a window at a time and stitches the slices,
+  keeping the region's columns and the content's full height; marks stay on what they were
+  drawn over. Sticky headings inside the panel sit in the flow instead of repeating, fixed
+  elements around it are left out, everything is scrolled back afterwards, the region stays
+  locked, and `Esc` stops it.
 - A **capture delay** of 3, 5 or 10 seconds (settings) counts down before a region is captured,
   which leaves time to open a menu or hover something. `Esc` stops the countdown and keeps the
   region.
@@ -132,11 +139,19 @@ Chrome does not allow extensions to inject into certain internal pages such as `
 Chrome Web Store, and some PDF/special tabs. For `file://` URLs, users may need to enable
 **Allow access to file URLs** in the extension's details.
 
-A full-page capture covers what the document itself scrolls. A page that scrolls inside an inner
-panel (many web apps do) gives only what is on screen, and content that loads while scrolling can
-change the page's height after the capture was planned. Chrome allows two screenshots a second, so
-a long page takes a moment, and one canvas holds at most 32,767 px in height: a longer page is cut
-there and the toast says so.
+A full-page capture covers what the document itself scrolls. For a page that scrolls inside an
+inner panel (many web apps do), lock a region in the panel and use **Capture a scrolling area**
+`⇣` instead. Either way, content that loads while scrolling can change the height after the
+capture was planned, and only vertical scrolling is stitched. Chrome allows two screenshots a
+second, so a long area takes a moment, and one canvas holds at most 32,767 px in height (less
+for very wide images): a longer area is cut there and the toast says so.
+
+The scrolling capture picks the nearest panel around the element a click picked, or around the
+region's centre for a dragged region. A panel partly off screen is scrolled into view first;
+if part of it still never comes on screen, the image stops where scrolling could reach and the
+toast says so. Sticky elements of the panel are shown in their place in the flow, so a sticky
+table heading appears once at the top. Fixed elements inside the panel, and anything drawn
+over the page by a script while it scrolls, can still repeat.
 
 ## Pre-release checks
 

@@ -55,7 +55,9 @@
   let textSize = "medium";
   // Set while a capture delay is counting down; calling it stops the countdown.
   let stopCountdown = null;
+  // Set while a full-page or scrolling capture runs; Escape marks it cancelled.
   let fullPageRun = null;
+  let lockedElement = null;
 
   let root;
   let dim;
@@ -89,7 +91,7 @@
   };
   // A press that travels less than this is a click on a note, not a drag of it.
   const CLICK_SLOP = 3;
-  const TOOLBAR_WIDTH = 540;
+  const TOOLBAR_WIDTH = 572;
   const TOOLBAR_HEIGHT = 40;
   const CORNER_RADIUS = 12;
 
@@ -140,6 +142,7 @@
       ).join("")}
       <button class="region-snap-text-size" type="button" data-size="${textSize}">A</button>
       <button class="region-snap-undo" type="button" disabled title="${t("overlayUndo")}" aria-label="${t("overlayUndo")}">↶</button>
+      <button class="region-snap-scroll" type="button" title="${t("overlayScrollCapture")}" aria-label="${t("overlayScrollCapture")}">⇣</button>
       <button class="region-snap-capture" type="button">${t("overlayCapture")}</button>
       <button class="region-snap-copy" type="button">${t("overlayCopy")}</button>
       <button class="region-snap-cancel" type="button" title="${t("overlayCancel")}" aria-label="${t("overlayCancel")}">×</button>
@@ -182,6 +185,9 @@
     document.documentElement.appendChild(root);
     toolbar.querySelector(".region-snap-capture").addEventListener("click", (event) => {
       if (event.isTrusted) doCapture({ action: "download" });
+    });
+    toolbar.querySelector(".region-snap-scroll").addEventListener("click", (event) => {
+      if (event.isTrusted) captureScrollingArea();
     });
     toolbar.querySelector(".region-snap-copy").addEventListener("click", (event) => {
       if (event.isTrusted) doCapture({ action: "copy" });
@@ -692,8 +698,11 @@
             Geometry.rectFromPoints(dragStart, { x: event.clientX, y: event.clientY }),
           )
         : elementRect(pickTarget || hoveredElement);
+    // A click picked an element; a scrolling capture starts from it instead of guessing.
+    const pickedElement = dragged ? null : pickTarget || hoveredElement;
 
     lockRegion(selectedRect);
+    if (state === STATE.LOCKED) lockedElement = pickedElement;
     clearTimeout(clickCleanupTimer);
     clickCleanupTimer = window.setTimeout(() => {
       document.removeEventListener("click", onPickingClick, true);
@@ -747,6 +756,7 @@
   function onHandleDown(event) {
     if (!event.isTrusted || !rect || state !== STATE.LOCKED || event.button !== 0) return;
     stopPageEvent(event);
+    lockedElement = null;
     activeHandle = event.currentTarget.dataset.handle;
     root.dataset.interacting = "true";
     document.addEventListener("mousemove", onHandleMove, true);
@@ -778,6 +788,7 @@
   function onMoveGripDown(event) {
     if (!event.isTrusted || !rect || state !== STATE.LOCKED || event.button !== 0) return;
     stopPageEvent(event);
+    lockedElement = null;
     moving = true;
     root.dataset.interacting = "true";
     moveOffset = { x: event.clientX - rect.left, y: event.clientY - rect.top };
@@ -819,6 +830,7 @@
     if (!direction) return false;
 
     const step = event.shiftKey ? 10 : 1;
+    lockedElement = null;
     rect = Geometry.moveRectTo(
       rect,
       rect.left + direction[0] * step,
@@ -850,9 +862,10 @@
     }
     if (event.key === "Escape") {
       event.preventDefault();
-      // Escape first stops a countdown, then puts the drawing tool down; the region is
-      // cancelled by the next one.
-      if (stopCountdown) stopCountdown();
+      // Escape first stops a scrolling capture or a countdown, then puts the drawing tool
+      // down; the region is cancelled by the next one.
+      if (fullPageRun) fullPageRun.cancelled = true;
+      else if (stopCountdown) stopCountdown();
       else if (activeTool) setTool(null);
       else reset();
       return;
@@ -936,6 +949,7 @@
     draftMark = null;
     textDrag = null;
     editor = null;
+    lockedElement = null;
     removeOverlay();
   }
 
@@ -1178,7 +1192,9 @@
   // A fixed element would repeat in every slice of a full-page capture, so those in the top
   // half of the viewport are kept for the first slice only and those in the bottom half for the
   // last. A sticky element goes back to where it sits in the flow. All of it is undone after.
-  function prepareFullPageLayout() {
+  // For a scrolling capture `target` is the panel or element photographed: only the sticky
+  // elements in `stickyScope` change, and fixed elements around the target are left alone.
+  function prepareFullPageLayout({ stickyScope = null, target = null } = {}) {
     const sticky = [];
     const top = [];
     const bottom = [];
@@ -1187,8 +1203,9 @@
       if (isOwnElement(element)) continue;
       const { position } = getComputedStyle(element);
       if (position === "sticky") {
-        sticky.push(element);
+        if (!stickyScope || stickyScope.contains(element)) sticky.push(element);
       } else if (position === "fixed") {
+        if (target && (element.contains(target) || target.contains(element))) continue;
         const bounds = element.getBoundingClientRect();
         if (bounds.width > 0 && bounds.height > 0) {
           (bounds.top + bounds.height / 2 < middle ? top : bottom).push(element);
@@ -1255,8 +1272,8 @@
   }
 
   // Photographs the page a viewport at a time and stitches the slices into one image. It
-  // covers what the document itself scrolls; a page that scrolls inside an inner panel only
-  // gives what is on screen.
+  // covers what the document itself scrolls; a panel that scrolls inside the page is what
+  // captureScrollingArea is for.
   async function captureFullPage() {
     if (capturing) return false;
     if (state === STATE.IDLE) sessionId += 1;
@@ -1396,6 +1413,300 @@
             if (captureSession === sessionId) closeIdleOverlay();
           }, 3000);
         }
+      }
+    }
+  }
+
+  const isPageRoot = (element) =>
+    !element || element === document.body || element === document.documentElement;
+
+  // The element the region shows: the one a click picked, or else the smallest element at the
+  // region's centre that holds the whole region.
+  function regionElement(value) {
+    if (lockedElement?.isConnected) return lockedElement;
+    const centre = { x: value.left + value.width / 2, y: value.top + value.height / 2 };
+    let element = document
+      .elementsFromPoint(centre.x, centre.y)
+      .find((item) => !isOwnElement(item) && item !== root);
+    while (!isPageRoot(element)) {
+      const bounds = element.getBoundingClientRect();
+      if (
+        bounds.left <= value.left + 1 &&
+        bounds.top <= value.top + 1 &&
+        bounds.right >= value.left + value.width - 1 &&
+        bounds.bottom >= value.top + value.height - 1
+      ) {
+        return element;
+      }
+      element = element.parentElement;
+    }
+    return element;
+  }
+
+  // The nearest panel that scrolls around the element wins; with none, an element taller than
+  // the window is photographed by scrolling the page. Anything else has nothing more to show.
+  function findScrollTarget(element) {
+    for (let node = element; !isPageRoot(node); node = node.parentElement) {
+      const { overflowY } = getComputedStyle(node);
+      if (Geometry.canScrollY(overflowY, node.scrollHeight, node.clientHeight)) {
+        return { kind: "panel", node };
+      }
+    }
+    const page = document.scrollingElement || document.documentElement;
+    if (!isPageRoot(element) && element.getBoundingClientRect().height > page.clientHeight + 1) {
+      return { kind: "element", node: element };
+    }
+    return null;
+  }
+
+  // Where a panel's content shows on screen: its box inside the borders and scrollbars, and
+  // the part of it inside the viewport.
+  function panelView(panel) {
+    const page = document.scrollingElement || document.documentElement;
+    const bounds = panel.getBoundingClientRect();
+    const top = bounds.top + panel.clientTop;
+    const left = bounds.left + panel.clientLeft;
+    const visibleTop = Math.max(top, 0);
+    const visibleBottom = Math.min(top + panel.clientHeight, page.clientHeight || innerHeight);
+    return {
+      top,
+      left,
+      width: panel.clientWidth,
+      visibleTop,
+      windowHeight: Math.max(1, visibleBottom - visibleTop),
+      offset: visibleTop - top,
+    };
+  }
+
+  // Remembers the scroll position of the page and of every element around `node`, which
+  // bringing a panel into view may move, and returns how to put them all back.
+  function rememberScroll(node) {
+    const saved = [];
+    for (let element = node; element; element = element.parentElement) {
+      saved.push([element, element.scrollLeft, element.scrollTop]);
+    }
+    const page = { left: window.scrollX, top: window.scrollY };
+    return () => {
+      for (const [element, left, top] of saved) {
+        if (element.scrollLeft !== left || element.scrollTop !== top) {
+          element.scrollTo({ left, top, behavior: "instant" });
+        }
+      }
+      window.scrollTo({ ...page, behavior: "instant" });
+    };
+  }
+
+  // Sets up the capture of a panel or a tall element: how to scroll it, the plan's area, the
+  // window the screenshots show, the columns to keep, and where the marks land in the image.
+  function measureScrollArea(target, selectedRect) {
+    const page = document.scrollingElement || document.documentElement;
+    const viewportWidth = page.clientWidth || innerWidth;
+    const { node } = target;
+    const crop = (left, right) => {
+      const from = Math.max(selectedRect.left, left, 0);
+      const to = Math.min(selectedRect.left + selectedRect.width, right, viewportWidth);
+      return to - from >= 1
+        ? { left: from, width: to - from }
+        : { left: Math.max(left, 0), width: Math.min(right, viewportWidth) - Math.max(left, 0) };
+    };
+
+    if (target.kind === "panel") {
+      const before = { ...panelView(node), scrollTop: node.scrollTop };
+      if (before.top < 0 || before.top + node.clientHeight > (page.clientHeight || innerHeight)) {
+        node.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
+      }
+      const view = panelView(node);
+      const columns = crop(view.left, view.left + view.width);
+      return {
+        scrollTo: (top) => node.scrollTo({ top, left: node.scrollLeft, behavior: "instant" }),
+        position: () => node.scrollTop,
+        area: {
+          start: 0,
+          end: node.scrollHeight,
+          offset: view.offset,
+          windowHeight: view.windowHeight,
+          maxScroll: node.scrollHeight - node.clientHeight,
+          width: columns.width,
+        },
+        view: { offset: view.offset, windowHeight: view.windowHeight, windowTop: view.visibleTop },
+        columns,
+        // A mark's place in the panel's content is fixed by where the panel stood when it was
+        // drawn: its viewport position, less the panel's top, plus how far it was scrolled.
+        markOrigin: (top) => ({
+          left: columns.left - (view.left - before.left),
+          top: before.top - before.scrollTop + top,
+        }),
+      };
+    }
+
+    const bounds = node.getBoundingClientRect();
+    const scrollTop = window.scrollY;
+    const windowHeight = page.clientHeight || innerHeight;
+    const columns = crop(bounds.left, bounds.right);
+    return {
+      scrollTo: (top) => window.scrollTo({ left: window.scrollX, top, behavior: "instant" }),
+      position: () => window.scrollY,
+      area: {
+        start: bounds.top + scrollTop,
+        end: bounds.bottom + scrollTop,
+        offset: 0,
+        windowHeight,
+        maxScroll: page.scrollHeight - windowHeight,
+        width: columns.width,
+      },
+      view: { offset: 0, windowHeight, windowTop: 0 },
+      columns,
+      markOrigin: (top) => ({ left: columns.left, top: top - scrollTop }),
+    };
+  }
+
+  // Photographs the whole of a scrolling panel, or of an element taller than the window, by
+  // scrolling it a window at a time and stitching the slices. The columns are the locked
+  // region's; the rows run from the top of the content to its end. Marks stay on the content
+  // they were drawn over. Scroll positions are put back afterwards and the region stays locked.
+  async function captureScrollingArea() {
+    if (state !== STATE.LOCKED || !rect) {
+      showToast(t("overlaySelectFirst"), "error");
+      return false;
+    }
+    if (capturing) return false;
+    commitEditor();
+    const target = findScrollTarget(regionElement(rect));
+    if (!target) {
+      showToast(t("overlayScrollNothing"), "error");
+      return false;
+    }
+
+    capturing = true;
+    const captureSession = sessionId;
+    const run = { cancelled: false };
+    fullPageRun = run;
+    const stopped = () => run.cancelled || captureSession !== sessionId;
+    const selectedRect = { ...rect };
+    const selectedMarks = marks.map((mark) => ({ ...mark }));
+    const restoreScroll = rememberScroll(target.kind === "panel" ? target.node : null);
+    let layout = null;
+    let canvas = null;
+    root.dataset.capturing = "true";
+
+    try {
+      const stored = await loadSettings();
+      if (stopped()) return false;
+      const copy = stored.defaultAction === "copy";
+      // The clipboard only takes PNG, so a copy ignores the chosen file format.
+      const settings = copy ? { ...stored, format: "png" } : stored;
+      const { mime } = IMAGE_FORMATS[settings.format];
+      layout = prepareFullPageLayout({
+        stickyScope: target.kind === "panel" ? target.node : null,
+        target: target.node,
+      });
+      // Fixed elements outside the target would repeat in every slice; none of them is kept.
+      layout.showFor(false, false);
+      const measured = measureScrollArea(target, selectedRect);
+      const guess = { x: window.devicePixelRatio || 1, y: window.devicePixelRatio || 1 };
+      let plan = Geometry.planScrollCapture(measured.area, guess);
+      let scale = null;
+      let context = null;
+      let covered = plan.top;
+      let lastCaptureAt = 0;
+
+      for (let index = 0; index < plan.positions.length; index += 1) {
+        measured.scrollTo(plan.positions[index]);
+        await nextFrame();
+        await nextFrame();
+        const pause = CAPTURE_INTERVAL_MS - (Date.now() - lastCaptureAt);
+        if (pause > 0) await new Promise((resolve) => window.setTimeout(resolve, pause));
+        if (stopped()) return false;
+
+        const position = measured.position();
+        const response = await chrome.runtime.sendMessage({ type: MESSAGE.CAPTURE_TAB });
+        lastCaptureAt = Date.now();
+        if (!response || response.error) {
+          throw new Error(response?.error || t("overlayCaptureMissing"));
+        }
+        if (stopped()) return false;
+        if (!response.dataUrl?.startsWith("data:image/")) throw new Error(t("overlayInvalidImage"));
+        const image = await loadImage(response.dataUrl);
+
+        if (!context) {
+          // The first screenshot gives the real pixel scale; the first position does not
+          // depend on it, the canvas limit does.
+          scale = {
+            x: image.naturalWidth / window.innerWidth,
+            y: image.naturalHeight / window.innerHeight,
+          };
+          plan = Geometry.planScrollCapture(measured.area, scale);
+          canvas = createScratchCanvas(plan.width, plan.height);
+          context = canvas.getContext("2d");
+          if (!context) throw new Error(t("overlayCanvasError"));
+          if (mime === "image/jpeg") {
+            context.fillStyle = "#ffffff";
+            context.fillRect(0, 0, canvas.width, canvas.height);
+          }
+          if (settings.roundedCorners) {
+            clipRoundedRect(context, canvas.width, canvas.height, CORNER_RADIUS * scale.y);
+          }
+        }
+        const slice = Geometry.scrollSlice(plan, position, measured.view, covered);
+        if (slice) {
+          const destTop = Math.round(slice.destTop * scale.y);
+          context.drawImage(
+            image,
+            measured.columns.left * scale.x,
+            slice.sourceTop * scale.y,
+            measured.columns.width * scale.x,
+            slice.height * scale.y,
+            0,
+            destTop,
+            plan.width,
+            Math.min(plan.height, Math.round((slice.destTop + slice.height) * scale.y)) - destTop,
+          );
+          covered = plan.top + slice.destTop + slice.height;
+        }
+        image.src = "";
+      }
+
+      Annotations.drawMarks(context, canvas, selectedMarks, {
+        origin: measured.markOrigin(plan.top),
+        scale,
+        createCanvas: createScratchCanvas,
+      });
+      layout.restore();
+      restoreScroll();
+      const blob = await canvasToBlob(canvas, mime);
+      if (stopped()) return false;
+      const outcome = await deliver(blob, settings, copy);
+      if (root && captureSession === sessionId) {
+        root.dataset.capturing = "false";
+        let message = DELIVERY_MESSAGES[outcome];
+        if (plan.truncated) {
+          message =
+            outcome === "copied" ? "overlayScrollCopiedTruncated" : "overlayScrollTruncated";
+        } else if (plan.partial) {
+          message = "overlayScrollPartial";
+        }
+        showToast(t(message), "success");
+      }
+      return true;
+    } catch (error) {
+      if (root && captureSession === sessionId) {
+        root.dataset.capturing = "false";
+        showToast(error?.message || t("overlayCaptureError"), "error");
+      }
+      console.error("Region Snap scrolling capture failed:", error);
+      return false;
+    } finally {
+      layout?.restore();
+      restoreScroll();
+      if (canvas) {
+        canvas.width = 1;
+        canvas.height = 1;
+      }
+      if (fullPageRun === run) fullPageRun = null;
+      if (captureSession === sessionId) {
+        capturing = false;
+        if (root) root.dataset.capturing = "false";
+        if (run.cancelled) showToast(t("overlayScrollStopped"));
       }
     }
   }

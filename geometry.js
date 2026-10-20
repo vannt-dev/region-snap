@@ -86,15 +86,77 @@
     return { width, height, positions, truncated: fullHeight > maxHeight };
   }
 
+  // An element scrolls its content when it is set to and has more content than room; a pixel
+  // of difference is rounding, not scrolling.
+  function canScrollY(overflowY, scrollHeight, clientHeight) {
+    return ["auto", "scroll", "overlay"].includes(overflowY) && scrollHeight > clientHeight + 1;
+  }
+
+  // Plans a scroll-and-stitch capture of one scroller: a panel inside the page, or the page
+  // itself for an element taller than the window. All lengths are CSS pixels in the scroller's
+  // content. At scroll position `s` the window shows content from `s + offset` for
+  // `windowHeight`; `start`–`end` is what should be captured and `width` how wide it is.
+  // Content the window can never show is left out (`partial`), and an image that would not
+  // fit in one canvas is cut at the limit (`truncated`).
+  function planScrollCapture(area, scale, limits = CANVAS_LIMITS) {
+    const windowHeight = Math.max(1, area.windowHeight);
+    const offset = Math.max(0, area.offset);
+    const maxScroll = Math.max(0, area.maxScroll);
+    const top = Math.max(area.start, offset);
+    const reachable = Math.max(top, Math.min(area.end, maxScroll + offset + windowHeight));
+    const width = Math.max(1, Math.round(area.width * scale.x));
+    const fullHeight = Math.max(1, Math.round((reachable - top) * scale.y));
+    const maxHeight = Math.max(1, Math.min(limits.dimension, Math.floor(limits.area / width)));
+    const height = Math.min(fullHeight, maxHeight);
+    const bottom = top + height / scale.y;
+
+    const positions = [];
+    let position = clamp(top - offset, 0, maxScroll);
+    for (;;) {
+      positions.push(position);
+      if (position + offset + windowHeight >= bottom) break;
+      const next = Math.min(position + windowHeight, maxScroll);
+      if (next <= position) break;
+      position = next;
+    }
+    return {
+      width,
+      height,
+      positions,
+      top,
+      bottom,
+      truncated: fullHeight > maxHeight,
+      partial: top - area.start > 0.5 || area.end - reachable > 0.5,
+    };
+  }
+
+  // What one screenshot adds to the stitched image: the rows of the window (from `sourceTop`
+  // in the viewport, CSS pixels) that land `destTop` below the top of the image. Rows above
+  // `covered` (content already drawn) are skipped; null when nothing new is on screen.
+  function scrollSlice(plan, position, view, covered = plan.top) {
+    const shownTop = position + view.offset;
+    const from = Math.max(shownTop, covered, plan.top);
+    const to = Math.min(shownTop + view.windowHeight, plan.bottom);
+    if (to - from < 0.5) return null;
+    return {
+      sourceTop: view.windowTop + (from - shownTop),
+      destTop: from - plan.top,
+      height: to - from,
+    };
+  }
+
   const api = Object.freeze({
     CANVAS_LIMITS,
+    canScrollY,
     clamp,
     fitRectToBounds,
     getCropMetrics,
     moveRectTo,
     planFullPage,
+    planScrollCapture,
     rectFromPoints,
     resizeRect,
+    scrollSlice,
   });
 
   scope.RegionSnapGeometry = api;

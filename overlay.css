@@ -484,3 +484,15 @@
   caret-color: #ef4444 !important;
   pointer-events: auto !important;
 }
+
+#region-snap-root .region-snap-scroll {
+  width: 28px !important;
+  padding: 0 !important;
+  color: #cbd5e1 !important;
+  background: transparent !important;
+  font-size: 15px !important;
+}
+
+#region-snap-root .region-snap-scroll:hover {
+  background: #334155 !important;
+}

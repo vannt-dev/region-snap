@@ -32,6 +32,12 @@ bản nào không có ở đó thì không phải do vannt-dev phát hành.
   lát thành một ảnh, không kèm thanh cuộn. Header cố định chỉ nằm ở lát đầu và footer cố định chỉ
   nằm ở lát cuối thay vì lặp lại suốt ảnh; phần tử sticky nằm đúng vị trí trong luồng. Chụp xong
   trang được cuộn về chỗ cũ, và `Esc` dừng việc chụp.
+- **Chụp vùng cuộn** `⇣` (thanh công cụ) chụp toàn bộ nội dung của một khung tự cuộn khi vùng
+  đã khóa nằm trong đó (luồng chat, danh sách thư, khung bên), hoặc một phần tử cao hơn cửa sổ.
+  Extension cuộn từng khung một rồi ghép các lát, giữ đúng các cột của vùng chọn và toàn bộ
+  chiều cao nội dung; nét vẽ nằm yên trên nội dung đã vẽ lên. Tiêu đề sticky trong khung nằm
+  đúng chỗ trong luồng thay vì lặp lại, phần tử cố định xung quanh bị bỏ ra, mọi thứ được cuộn
+  về chỗ cũ, vùng chọn vẫn được khóa, và `Esc` dừng việc chụp.
 - **Hẹn giờ chụp** 3, 5 hoặc 10 giây (trong cài đặt) đếm ngược trước khi chụp vùng chọn, đủ để
   mở menu hoặc rê chuột lên một phần tử. `Esc` dừng đếm ngược và giữ nguyên vùng chọn.
 - Trang cài đặt (popup → **Cài đặt**) cho chọn định dạng ảnh (PNG, JPEG hoặc WebP), tắt bo góc, đặt
@@ -116,7 +122,9 @@ Chi tiết ranh giới module và hướng dẫn mở rộng nằm tại [`docs/
 
 Chrome không cho extension inject vào một số trang nội bộ như `chrome://`, trang Chrome Web Store và một số PDF/tab đặc biệt. Với URL `file://`, người dùng có thể cần bật **Allow access to file URLs** trong phần chi tiết extension.
 
-Chụp toàn trang lấy phần mà chính tài liệu cuộn. Trang cuộn bên trong một khung con (nhiều web app làm vậy) chỉ cho phần đang hiện trên màn hình, và nội dung tải thêm khi cuộn có thể làm chiều cao trang đổi sau khi đã tính xong. Chrome cho chụp hai ảnh mỗi giây nên trang dài mất một lúc, và một canvas cao tối đa 32.767 px: trang dài hơn bị cắt ở đó và toast có báo.
+Chụp toàn trang lấy phần mà chính tài liệu cuộn. Với trang cuộn bên trong một khung con (nhiều web app làm vậy), hãy khóa một vùng trong khung đó rồi dùng **Chụp vùng cuộn** `⇣`. Ở cả hai cách, nội dung tải thêm khi cuộn có thể làm chiều cao đổi sau khi đã tính xong, và chỉ cuộn dọc được ghép. Chrome cho chụp hai ảnh mỗi giây nên vùng dài mất một lúc, và một canvas cao tối đa 32.767 px (thấp hơn với ảnh rất rộng): vùng dài hơn bị cắt ở đó và toast có báo.
+
+Chụp vùng cuộn chọn khung cuộn gần nhất quanh phần tử đã bấm chọn, hoặc quanh tâm vùng chọn nếu vùng được kéo. Khung nằm một phần ngoài màn hình sẽ được cuộn vào tầm nhìn trước; nếu vẫn còn phần không bao giờ hiện lên, ảnh dừng ở chỗ cuộn tới được và toast có báo. Phần tử sticky của khung được đặt về chỗ của nó trong luồng, nên tiêu đề bảng sticky chỉ hiện một lần ở đầu. Phần tử cố định nằm trong khung, và những gì script vẽ đè lên trang trong lúc cuộn, vẫn có thể lặp lại.
 
 ## Kiểm tra nhanh trước khi phát hành
 
