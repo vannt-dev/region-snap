@@ -496,3 +496,63 @@
 #region-snap-root .region-snap-scroll:hover {
   background: #334155 !important;
 }
+
+#region-snap-root .region-snap-burst,
+#region-snap-root .region-snap-watch {
+  width: 28px !important;
+  padding: 0 !important;
+  color: #cbd5e1 !important;
+  background: transparent !important;
+  font-size: 15px !important;
+}
+
+#region-snap-root .region-snap-burst:hover,
+#region-snap-root .region-snap-watch:hover {
+  background: #334155 !important;
+}
+
+#region-snap-root .region-snap-burst[aria-pressed="true"],
+#region-snap-root .region-snap-watch[aria-pressed="true"] {
+  color: #1f2937 !important;
+  background: #f59e0b !important;
+}
+
+#region-snap-root .region-snap-run {
+  display: none !important;
+  padding: 0 4px !important;
+  color: #fbbf24 !important;
+  font:
+    600 11px/28px ui-monospace,
+    SFMono-Regular,
+    Consolas,
+    monospace !important;
+  font-variant-numeric: tabular-nums !important;
+  white-space: nowrap !important;
+}
+
+#region-snap-root:not([data-run="none"]) .region-snap-run {
+  display: inline-block !important;
+}
+
+#region-snap-root .region-snap-run::before {
+  content: "● " !important;
+  animation: rs-armed 1s ease-in-out infinite;
+}
+
+#region-snap-root[data-run="burst"] .region-snap-border,
+#region-snap-root[data-run="watch"] .region-snap-border {
+  border-color: #f59e0b !important;
+  border-style: dashed !important;
+}
+
+@keyframes rs-armed {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #region-snap-root .region-snap-run::before {
+    animation: none;
+  }
+}

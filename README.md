@@ -41,6 +41,15 @@ anything else is not published by vannt-dev.
   drawn over. Sticky headings inside the panel sit in the flow instead of repeating, fixed
   elements around it are left out, everything is scrolled back afterwards, the region stays
   locked, and `Esc` stops it.
+- **Burst** `⧉` (toolbar) takes several shots of the locked region in a row: 3, 5, 10 or 20 shots,
+  1, 2 or 5 seconds apart (settings), after the capture delay if one is set.
+- **Capture on change** `◉` (toolbar) watches the region and saves it each time its content
+  changes, once the change has settled (a quick run of changes is saved once). It stops by itself
+  after 5, 10, 25 or 50 shots (settings), or when the button or `Esc` stops it. While a series
+  runs, the region's border turns amber and the toolbar counts the shots.
+- The shots of a burst or a watch are downloaded as numbered files that share one timestamp
+  (`region-snap-20261020-101500-01.png`, `-02`, …), in the chosen format, even when the default
+  action is copy. Chrome may ask once to allow the site several downloads.
 - A **capture delay** of 3, 5 or 10 seconds (settings) counts down before a region is captured,
   which leaves time to open a menu or hover something. `Esc` stops the countdown and keeps the
   region.
@@ -107,8 +116,8 @@ Keyboard shortcuts can be changed at `chrome://extensions/shortcuts`.
 
 - `activeTab`: access to the current tab only after a direct user action.
 - `scripting`: injects the region-selection UI into the active tab.
-- `storage`: keeps the settings (image format, corners, file name prefix, default action and
-  capture delay) on this device. Nothing else is stored.
+- `storage`: keeps the settings (image format, corners, file name prefix, default action,
+  capture delay, burst and capture-on-change counts) on this device. Nothing else is stored.
 
 The extension processes images entirely in the browser and never sends images to a server.
 
@@ -126,6 +135,9 @@ Module boundaries and extension guidelines live in
   is unit tested in isolation.
 - `annotations.js` holds the marks: their geometry, and how they are drawn onto the cropped image.
   Like `geometry.js` it never touches the DOM and is unit tested in isolation.
+- `schedule.js` decides when a burst shot or a capture on change is due (quiet time, longest
+  wait, Chrome's capture rate). It takes its clock and timers as arguments and is unit tested
+  without waiting.
 - `content.js` only exists in a tab after the user requests region selection.
 - High-frequency pointer events are coalesced and rendered at most once per animation frame.
 - The overlay uses CSS custom properties and hardware-accelerated transforms, and never reads layout
@@ -152,6 +164,10 @@ if part of it still never comes on screen, the image stops where scrolling could
 toast says so. Sticky elements of the panel are shown in their place in the flow, so a sticky
 table heading appears once at the top. Fixed elements inside the panel, and anything drawn
 over the page by a script while it scrolls, can still repeat.
+
+Capture on change listens for changes to the page's elements, text and attributes under the
+region. A change drawn without touching them, such as a playing video or a canvas animation,
+is not seen; a hover that restyles an element under the region is.
 
 ## Pre-release checks
 

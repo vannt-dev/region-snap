@@ -13,6 +13,9 @@ framework or bundler, which keeps the Store package small and makes its contents
   routing, and visible-tab capture.
 - `geometry.js` contains pure rectangle and crop calculations. Keep DOM and Chrome APIs out of this
   module so it remains straightforward to unit test.
+- `annotations.js` holds the marks' geometry and drawing, and `schedule.js` the timing of burst and
+  capture-on-change shots. Both stay free of DOM and Chrome APIs; `schedule.js` takes its clock
+  and timers as arguments.
 - `content.js` owns the selection lifecycle, overlay events, crop rendering, and local download. Its
   controller must remove every listener it creates when `destroy()` is called.
 - `popup.js` only renders current state and sends commands. It does not inject scripts or capture tabs

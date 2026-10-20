@@ -38,6 +38,15 @@ bản nào không có ở đó thì không phải do vannt-dev phát hành.
   chiều cao nội dung; nét vẽ nằm yên trên nội dung đã vẽ lên. Tiêu đề sticky trong khung nằm
   đúng chỗ trong luồng thay vì lặp lại, phần tử cố định xung quanh bị bỏ ra, mọi thứ được cuộn
   về chỗ cũ, vùng chọn vẫn được khóa, và `Esc` dừng việc chụp.
+- **Chụp liên tiếp** `⧉` (thanh công cụ) chụp vùng đã khóa nhiều lần liền nhau: 3, 5, 10 hoặc
+  20 ảnh, cách nhau 1, 2 hoặc 5 giây (trong cài đặt), sau thời gian hẹn giờ nếu có.
+- **Chụp khi thay đổi** `◉` (thanh công cụ) theo dõi vùng chọn và lưu ảnh mỗi lần nội dung thay
+  đổi, khi thay đổi đã lắng xuống (một loạt thay đổi nhanh chỉ lưu một ảnh). Tự dừng sau 5, 10,
+  25 hoặc 50 ảnh (trong cài đặt), hoặc khi bấm lại nút hay nhấn `Esc`. Trong lúc chạy, viền vùng
+  chọn chuyển màu hổ phách và thanh công cụ đếm số ảnh.
+- Ảnh của một lượt chụp liên tiếp hoặc theo dõi được tải về thành các tệp đánh số chung một mốc
+  thời gian (`region-snap-20261020-101500-01.png`, `-02`, …), theo định dạng đã chọn, kể cả khi
+  thao tác mặc định là sao chép. Chrome có thể hỏi một lần để cho phép trang tải nhiều tệp.
 - **Hẹn giờ chụp** 3, 5 hoặc 10 giây (trong cài đặt) đếm ngược trước khi chụp vùng chọn, đủ để
   mở menu hoặc rê chuột lên một phần tử. `Esc` dừng đếm ngược và giữ nguyên vùng chọn.
 - Trang cài đặt (popup → **Cài đặt**) cho chọn định dạng ảnh (PNG, JPEG hoặc WebP), tắt bo góc, đặt
@@ -98,8 +107,8 @@ Có thể thay đổi phím tắt tại `chrome://extensions/shortcuts`.
 
 - `activeTab`: chỉ truy cập tab hiện tại sau hành động trực tiếp của người dùng.
 - `scripting`: inject giao diện chọn vùng vào tab đang được kích hoạt.
-- `storage`: lưu các cài đặt (định dạng ảnh, bo góc, tiền tố tên tệp, thao tác mặc định và hẹn
-  giờ chụp) trên chính thiết bị này. Không lưu gì khác.
+- `storage`: lưu các cài đặt (định dạng ảnh, bo góc, tiền tố tên tệp, thao tác mặc định, hẹn giờ
+  chụp, số ảnh chụp liên tiếp và chụp khi thay đổi) trên chính thiết bị này. Không lưu gì khác.
 
 Extension xử lý ảnh ngay trong trình duyệt và không gửi ảnh ra máy chủ.
 
@@ -112,6 +121,7 @@ Chi tiết ranh giới module và hướng dẫn mở rộng nằm tại [`docs/
 - `background.js` điều phối lệnh, chống inject trùng trên cùng tab và gọi API chụp của Chrome.
 - `shared.js` là contract duy nhất cho message, state, command và phím tắt giữa các context.
 - `annotations.js` chứa các nét đánh dấu: hình học của chúng và cách vẽ lên ảnh đã cắt; cũng không truy cập DOM và được unit test độc lập.
+- `schedule.js` quyết định khi nào tới lượt một ảnh chụp liên tiếp hoặc một ảnh chụp khi thay đổi (thời gian lắng, thời gian chờ tối đa, giới hạn chụp của Chrome); đồng hồ và bộ hẹn giờ được truyền vào nên unit test không phải chờ.
 - `geometry.js` chứa toàn bộ phép tính vùng, resize, di chuyển và tỷ lệ crop; module này không truy cập DOM và được unit test độc lập.
 - `content.js` chỉ tồn tại trong tab sau khi người dùng yêu cầu chọn vùng.
 - Các sự kiện chuột tốc độ cao được gộp và render tối đa một lần trong mỗi animation frame.
@@ -125,6 +135,8 @@ Chrome không cho extension inject vào một số trang nội bộ như `chrome
 Chụp toàn trang lấy phần mà chính tài liệu cuộn. Với trang cuộn bên trong một khung con (nhiều web app làm vậy), hãy khóa một vùng trong khung đó rồi dùng **Chụp vùng cuộn** `⇣`. Ở cả hai cách, nội dung tải thêm khi cuộn có thể làm chiều cao đổi sau khi đã tính xong, và chỉ cuộn dọc được ghép. Chrome cho chụp hai ảnh mỗi giây nên vùng dài mất một lúc, và một canvas cao tối đa 32.767 px (thấp hơn với ảnh rất rộng): vùng dài hơn bị cắt ở đó và toast có báo.
 
 Chụp vùng cuộn chọn khung cuộn gần nhất quanh phần tử đã bấm chọn, hoặc quanh tâm vùng chọn nếu vùng được kéo. Khung nằm một phần ngoài màn hình sẽ được cuộn vào tầm nhìn trước; nếu vẫn còn phần không bao giờ hiện lên, ảnh dừng ở chỗ cuộn tới được và toast có báo. Phần tử sticky của khung được đặt về chỗ của nó trong luồng, nên tiêu đề bảng sticky chỉ hiện một lần ở đầu. Phần tử cố định nằm trong khung, và những gì script vẽ đè lên trang trong lúc cuộn, vẫn có thể lặp lại.
+
+Chụp khi thay đổi lắng nghe thay đổi của phần tử, chữ và thuộc tính của trang dưới vùng chọn. Thay đổi được vẽ mà không chạm tới chúng, như video đang phát hay hoạt ảnh canvas, sẽ không được nhận ra; còn việc rê chuột làm đổi kiểu một phần tử dưới vùng chọn thì có.
 
 ## Kiểm tra nhanh trước khi phát hành
 

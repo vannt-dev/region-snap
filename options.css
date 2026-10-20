@@ -99,6 +99,17 @@ button:focus-visible {
   outline-offset: 2px;
 }
 
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 18px;
+}
+
+.group-label {
+  margin: 6px 0 0;
+  font-size: 12px;
+}
+
 .hint {
   margin: 6px 0 0;
   color: var(--rs-muted);

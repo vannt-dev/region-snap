@@ -9,7 +9,8 @@
   const Geometry = globalThis.RegionSnapGeometry;
   const Shared = globalThis.RegionSnapShared;
   const Annotations = globalThis.RegionSnapAnnotations;
-  if (!Geometry || !Shared || !Annotations) {
+  const Schedule = globalThis.RegionSnapSchedule;
+  if (!Geometry || !Shared || !Annotations || !Schedule) {
     console.error("Region Snap: required modules are unavailable.");
     return;
   }
@@ -58,6 +59,9 @@
   // Set while a full-page or scrolling capture runs; Escape marks it cancelled.
   let fullPageRun = null;
   let lockedElement = null;
+  // A burst or a capture-on-change run: its kind, the shots taken and allowed, its settings and
+  // the series timestamp. One runs at a time.
+  let seriesRun = null;
 
   let root;
   let dim;
@@ -71,6 +75,9 @@
   let markSvg;
   let undoButton;
   let textSizeButton;
+  let burstButton;
+  let watchButton;
+  let runLabel;
   const handles = {};
 
   const SVG_NS = "http://www.w3.org/2000/svg";
@@ -91,7 +98,15 @@
   };
   // A press that travels less than this is a click on a note, not a drag of it.
   const CLICK_SLOP = 3;
-  const TOOLBAR_WIDTH = 572;
+  const TOOLBAR_WIDTH = 680;
+  // Capture on change waits for the region to be still this long, but never longer than the
+  // second value after the first change, so content that never settles is still captured.
+  const WATCH_QUIET_MS = 400;
+  const WATCH_MAX_WAIT_MS = 2000;
+  const SERIES_LABELS = {
+    burst: { start: "overlayBurst", stop: "overlayBurstStop" },
+    watch: { start: "overlayWatch", stop: "overlayWatchStop" },
+  };
   const TOOLBAR_HEIGHT = 40;
   const CORNER_RADIUS = 12;
 
@@ -143,6 +158,9 @@
       <button class="region-snap-text-size" type="button" data-size="${textSize}">A</button>
       <button class="region-snap-undo" type="button" disabled title="${t("overlayUndo")}" aria-label="${t("overlayUndo")}">↶</button>
       <button class="region-snap-scroll" type="button" title="${t("overlayScrollCapture")}" aria-label="${t("overlayScrollCapture")}">⇣</button>
+      <button class="region-snap-burst" type="button" aria-pressed="false">⧉</button>
+      <button class="region-snap-watch" type="button" aria-pressed="false">◉</button>
+      <span class="region-snap-run" aria-live="polite"></span>
       <button class="region-snap-capture" type="button">${t("overlayCapture")}</button>
       <button class="region-snap-copy" type="button">${t("overlayCopy")}</button>
       <button class="region-snap-cancel" type="button" title="${t("overlayCancel")}" aria-label="${t("overlayCancel")}">×</button>
@@ -151,6 +169,9 @@
     sizeLabel = toolbar.querySelector(".region-snap-size");
     undoButton = toolbar.querySelector(".region-snap-undo");
     textSizeButton = toolbar.querySelector(".region-snap-text-size");
+    burstButton = toolbar.querySelector(".region-snap-burst");
+    watchButton = toolbar.querySelector(".region-snap-watch");
+    runLabel = toolbar.querySelector(".region-snap-run");
     labelTextSize();
 
     // The layer is the region's own box and clips what is drawn; the surface inside it is
@@ -171,6 +192,7 @@
     toast.setAttribute("aria-live", "polite");
 
     root.dataset.tool = "none";
+    root.dataset.run = "none";
     root.append(dim, markLayer, border, toolbar, toast);
     for (const position of ["nw", "ne", "sw", "se"]) {
       const handle = document.createElement("button");
@@ -186,6 +208,13 @@
     toolbar.querySelector(".region-snap-capture").addEventListener("click", (event) => {
       if (event.isTrusted) doCapture({ action: "download" });
     });
+    burstButton.addEventListener("click", (event) => {
+      if (event.isTrusted) toggleSeries("burst");
+    });
+    watchButton.addEventListener("click", (event) => {
+      if (event.isTrusted) toggleSeries("watch");
+    });
+    showSeries();
     toolbar.querySelector(".region-snap-scroll").addEventListener("click", (event) => {
       if (event.isTrusted) captureScrollingArea();
     });
@@ -219,6 +248,7 @@
     root?.remove();
     root = dim = border = toolbar = gripButton = sizeLabel = toast = null;
     markLayer = markSurface = markSvg = undoButton = textSizeButton = null;
+    burstButton = watchButton = runLabel = null;
     editor = null;
     textDrag = null;
     for (const position of Object.keys(handles)) delete handles[position];
@@ -866,6 +896,7 @@
       // down; the region is cancelled by the next one.
       if (fullPageRun) fullPageRun.cancelled = true;
       else if (stopCountdown) stopCountdown();
+      else if (seriesRun) stopSeries("stopped");
       else if (activeTool) setTool(null);
       else reset();
       return;
@@ -925,6 +956,7 @@
   function reset() {
     sessionId += 1;
     stopCountdown?.();
+    stopSeries("reset");
     removeInteractionListeners();
     clearTimeout(clickCleanupTimer);
     clearTimeout(toastTimer);
@@ -1005,11 +1037,11 @@
     context.clip();
   }
 
-  function downloadBlob(blob, settings) {
+  function downloadBlob(blob, settings, name = buildFileName(settings, new Date())) {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = buildFileName(settings, new Date());
+    anchor.download = name;
     anchor.style.display = "none";
     anchor.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
@@ -1709,6 +1741,211 @@
         if (run.cancelled) showToast(t("overlayScrollStopped"));
       }
     }
+  }
+
+  // Shows whether a series runs: the pressed button, its stop label, and the shot count.
+  function showSeries() {
+    if (!root || !burstButton) return;
+    root.dataset.run = seriesRun?.kind || "none";
+    runLabel.textContent = seriesRun ? `${seriesRun.shots}/${seriesRun.limit}` : "";
+    for (const [kind, button] of [
+      ["burst", burstButton],
+      ["watch", watchButton],
+    ]) {
+      const active = seriesRun?.kind === kind;
+      const label = t(SERIES_LABELS[kind][active ? "stop" : "start"]);
+      button.setAttribute("aria-pressed", String(active));
+      button.title = label;
+      button.setAttribute("aria-label", label);
+    }
+  }
+
+  const SERIES_MESSAGES = {
+    done: "overlayBurstDone",
+    limit: "overlayWatchLimit",
+    stopped: "overlaySeriesStopped",
+  };
+
+  // Ends the series that runs, if any, and says how many images it saved. `reason` is "done",
+  // "limit", "stopped", "reset", or the error that ended it.
+  function stopSeries(reason) {
+    const run = seriesRun;
+    if (!run) return;
+    run.stopped = true;
+    run.watcher?.stop();
+    run.observer?.disconnect();
+    if (run.kind === "burst") stopCountdown?.();
+    seriesRun = null;
+    showSeries();
+    if (reason === "reset") return;
+    if (SERIES_MESSAGES[reason]) {
+      showToast(t(SERIES_MESSAGES[reason], [String(run.shots)]), "success");
+    } else {
+      showToast(reason?.message || t("overlayCaptureError"), "error");
+      console.error("Region Snap series capture failed:", reason);
+    }
+  }
+
+  // Takes one shot of a series: the region as it is now, with its marks, saved under the
+  // series' timestamp and the shot's number. A series always downloads; the clipboard holds
+  // one image.
+  async function shootSeries(run) {
+    if (!rect || capturing) return false;
+    capturing = true;
+    const captureSession = sessionId;
+    commitEditor();
+    try {
+      const selectedRect = { ...rect };
+      const selectedMarks = marks.map((mark) => ({ ...mark }));
+      root.dataset.capturing = "true";
+      await nextFrame();
+      await nextFrame();
+      if (captureSession !== sessionId) return false;
+      const response = await chrome.runtime.sendMessage({ type: MESSAGE.CAPTURE_TAB });
+      run.lastCaptureAt = Date.now();
+      if (!response || response.error) {
+        throw new Error(response?.error || t("overlayCaptureMissing"));
+      }
+      if (captureSession !== sessionId) return false;
+      root.dataset.capturing = "false";
+      const blob = await cropToBlob(response.dataUrl, selectedRect, run.settings, selectedMarks);
+      if (captureSession !== sessionId) return false;
+      const shot = Schedule.shotNumber(run.shots, run.limit);
+      downloadBlob(blob, run.settings, buildFileName(run.settings, run.startedAt, shot));
+      run.shots += 1;
+      if (seriesRun === run) showSeries();
+      return true;
+    } finally {
+      if (captureSession === sessionId) {
+        capturing = false;
+        if (root) root.dataset.capturing = "false";
+      }
+    }
+  }
+
+  // Takes the burst's shots at the interval from the settings, after the capture delay if one
+  // is set. The button or Escape stops it.
+  async function runBurst(run) {
+    if (
+      run.settings.captureDelay > 0 &&
+      !(await countDown(run.settings.captureDelay, run.session))
+    ) {
+      if (seriesRun === run) stopSeries("stopped");
+      return;
+    }
+    const startedAt = Date.now();
+    run.startedAt = new Date();
+    try {
+      while (run.shots < run.limit) {
+        const wait = Schedule.burstDelay({
+          index: run.shots,
+          startedAt,
+          interval: run.settings.burstInterval * 1000,
+          lastCaptureAt: run.lastCaptureAt,
+          minGap: CAPTURE_INTERVAL_MS,
+          now: Date.now(),
+        });
+        if (wait > 0) await new Promise((resolve) => window.setTimeout(resolve, wait));
+        if (run.stopped || run.session !== sessionId) return;
+        // A capture of the user's own is under way: try again once the interval has passed.
+        if (!(await shootSeries(run))) run.lastCaptureAt = Date.now();
+        if (run.stopped || run.session !== sessionId) return;
+      }
+      stopSeries("done");
+    } catch (error) {
+      if (seriesRun === run) stopSeries(error);
+    }
+  }
+
+  // Whether a change the observer saw touches the locked region. Changes in the overlay, and
+  // in parts of the page outside the region, do not count.
+  function changesRegion(record) {
+    const node =
+      record.target.nodeType === Node.ELEMENT_NODE ? record.target : record.target.parentElement;
+    if (!node || !rect || isOwnElement(node) || node === root) return false;
+    const bounds = node.getBoundingClientRect();
+    return (
+      bounds.right > rect.left &&
+      bounds.left < rect.left + rect.width &&
+      bounds.bottom > rect.top &&
+      bounds.top < rect.top + rect.height
+    );
+  }
+
+  async function watchShot(run) {
+    if (run.stopped || run.session !== sessionId) return;
+    try {
+      if (!(await shootSeries(run))) {
+        // Busy with another capture: count this one as a capture and look again shortly.
+        run.watcher.captured(Date.now());
+        run.watcher.notify();
+        return;
+      }
+    } catch (error) {
+      if (seriesRun === run) stopSeries(error);
+      return;
+    }
+    if (run.stopped) return;
+    run.watcher.captured(Date.now());
+    if (run.shots >= run.limit) stopSeries("limit");
+  }
+
+  // Watches the element under the region and saves the region each time its content changes,
+  // once the change has settled, until the limit from the settings or until it is stopped.
+  function startWatch(run) {
+    const target = regionElement(rect);
+    if (!target) return false;
+    run.watcher = Schedule.createChangeWatcher({
+      quiet: WATCH_QUIET_MS,
+      maxWait: WATCH_MAX_WAIT_MS,
+      minGap: CAPTURE_INTERVAL_MS,
+      now: () => Date.now(),
+      setTimer: (callback, delay) => window.setTimeout(callback, delay),
+      clearTimer: (timer) => clearTimeout(timer),
+      onFire: () => watchShot(run),
+    });
+    run.observer = new MutationObserver((records) => {
+      if (!run.stopped && records.some(changesRegion)) run.watcher.notify();
+    });
+    run.observer.observe(target, {
+      attributes: true,
+      characterData: true,
+      childList: true,
+      subtree: true,
+    });
+    showToast(t("overlayWatchArmed", [String(run.limit)]));
+    return true;
+  }
+
+  // The burst and watch buttons start their series, or stop the one that runs.
+  async function toggleSeries(kind) {
+    if (seriesRun) {
+      const running = seriesRun.kind;
+      stopSeries("stopped");
+      if (running === kind) return;
+    }
+    if (state !== STATE.LOCKED || !rect) {
+      showToast(t("overlaySelectFirst"), "error");
+      return;
+    }
+    if (capturing || stopCountdown) return;
+    const session = sessionId;
+    const settings = await loadSettings();
+    if (session !== sessionId || seriesRun) return;
+    const run = {
+      kind,
+      shots: 0,
+      limit: kind === "burst" ? settings.burstCount : settings.watchLimit,
+      settings,
+      session,
+      startedAt: new Date(),
+      lastCaptureAt: 0,
+      stopped: false,
+    };
+    seriesRun = run;
+    showSeries();
+    if (kind === "burst") runBurst(run);
+    else if (!startWatch(run)) stopSeries("stopped");
   }
 
   function onRuntimeMessage(message, _sender, sendResponse) {

@@ -11,6 +11,7 @@ export const RUNTIME_FILES = Object.freeze([
   "background.js",
   "geometry.js",
   "annotations.js",
+  "schedule.js",
   "content.js",
   "overlay.css",
   "popup.html",

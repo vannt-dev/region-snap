@@ -24,6 +24,7 @@ test("all extension entry files exist", () => {
     "shared.js",
     "geometry.js",
     "annotations.js",
+    "schedule.js",
     "content.js",
     "overlay.css",
     "popup.js",
