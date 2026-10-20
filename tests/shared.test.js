@@ -32,11 +32,14 @@ test("stored settings fall back to defaults field by field", () => {
   assert.deepEqual(
     shared.normalizeSettings({ defaultAction: "copy", format: "webp", roundedCorners: false }),
     {
+      burstCount: 5,
+      burstInterval: 1,
       captureDelay: 0,
       defaultAction: "copy",
       fileNamePrefix: "region-snap",
       format: "webp",
       roundedCorners: false,
+      watchLimit: 10,
     },
   );
   // Only the offered delays pass, and only as numbers: a form value arrives as text.
@@ -75,4 +78,34 @@ test("file names carry the prefix, a local timestamp and the format's extension"
     "shot-20260105-090703.jpg",
   );
   assert.equal(shared.buildFileName({ format: "webp" }, date), "region-snap-20260105-090703.webp");
+});
+
+test("burst and capture-on-change settings only take the offered values", () => {
+  const settings = shared.normalizeSettings({ burstCount: 10, burstInterval: 2, watchLimit: 25 });
+  assert.equal(settings.burstCount, 10);
+  assert.equal(settings.burstInterval, 2);
+  assert.equal(settings.watchLimit, 25);
+  const odd = shared.normalizeSettings({ burstCount: 7, burstInterval: "2", watchLimit: 1e6 });
+  assert.equal(odd.burstCount, shared.DEFAULT_SETTINGS.burstCount);
+  assert.equal(odd.burstInterval, shared.DEFAULT_SETTINGS.burstInterval);
+  assert.equal(odd.watchLimit, shared.DEFAULT_SETTINGS.watchLimit);
+  for (const [key, allowed] of [
+    ["burstCount", shared.BURST_COUNTS],
+    ["burstInterval", shared.BURST_INTERVALS],
+    ["watchLimit", shared.WATCH_LIMITS],
+  ]) {
+    assert.ok(allowed.includes(shared.DEFAULT_SETTINGS[key]), `${key} default is offered`);
+  }
+});
+
+test("the shots of a series share a timestamp and carry their number", () => {
+  const date = new Date(2026, 0, 5, 9, 7, 3);
+  assert.equal(
+    shared.buildFileName(shared.DEFAULT_SETTINGS, date, "03"),
+    "region-snap-20260105-090703-03.png",
+  );
+  assert.equal(
+    shared.buildFileName({ format: "jpeg" }, date, "10"),
+    "region-snap-20260105-090703-10.jpg",
+  );
 });

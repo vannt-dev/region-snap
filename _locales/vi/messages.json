@@ -120,5 +120,36 @@
   "optionsFileNameExample": { "message": "Ví dụ:" },
   "optionsReset": { "message": "Khôi phục mặc định" },
   "optionsSaved": { "message": "Đã lưu" },
-  "optionsSaveError": { "message": "Không lưu được cài đặt" }
+  "optionsSaveError": { "message": "Không lưu được cài đặt" },
+  "overlayBurst": { "message": "Chụp liên tiếp nhiều ảnh" },
+  "overlayBurstStop": { "message": "Dừng chụp liên tiếp" },
+  "overlayWatch": { "message": "Chụp mỗi khi vùng chọn thay đổi" },
+  "overlayWatchStop": { "message": "Dừng chụp khi thay đổi" },
+  "overlayWatchArmed": {
+    "message": "Đang theo dõi — mỗi thay đổi được lưu, tối đa $COUNT$ ảnh. Esc để dừng.",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "overlayBurstDone": {
+    "message": "Chụp liên tiếp xong — đã lưu $COUNT$ ảnh",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "overlayWatchLimit": {
+    "message": "Đã dừng sau $COUNT$ ảnh",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "overlaySeriesStopped": {
+    "message": "Đã dừng — đã lưu $COUNT$ ảnh",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "optionsBurst": { "message": "Chụp liên tiếp" },
+  "optionsBurstCount": { "message": "Số ảnh" },
+  "optionsBurstInterval": { "message": "Khoảng cách giữa hai ảnh" },
+  "optionsBurstHint": {
+    "message": "Nút chụp liên tiếp trên thanh công cụ chụp vùng chọn chừng ấy lần, mỗi ảnh lưu thành một tệp có số thứ tự. Chrome có thể hỏi một lần để cho phép trang tải nhiều tệp."
+  },
+  "optionsWatch": { "message": "Chụp khi thay đổi" },
+  "optionsWatchLimit": { "message": "Dừng sau chừng ấy ảnh" },
+  "optionsWatchHint": {
+    "message": "Khi đang theo dõi, vùng chọn được lưu mỗi lần nội dung thay đổi, tối đa chừng ấy ảnh. Nút trên thanh công cụ hoặc Esc dừng sớm hơn."
+  }
 }

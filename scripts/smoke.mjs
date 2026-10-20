@@ -56,7 +56,7 @@ try {
     return result;
   }
   const runtimeSources = await Promise.all(
-    ["shared.js", "geometry.js", "annotations.js", "content.js"].map((file) =>
+    ["shared.js", "geometry.js", "annotations.js", "schedule.js", "content.js"].map((file) =>
       fs.readFile(path.join(DIST_DIR, file), "utf8"),
     ),
   );
@@ -463,6 +463,81 @@ try {
   const waited = Date.now() - countdownStart;
   assert.ok(waited >= 2900, `the capture must wait out the delay, waited ${waited} ms`);
 
+  // Burst: the shots of a series share one timestamp, carry their number, keep the interval
+  // from the settings, and always download, even with copy as the default action.
+  const seriesFiles = [];
+  targetPage.on("download", (item) =>
+    seriesFiles.push({ name: item.suggestedFilename(), at: Date.now() }),
+  );
+  await storeSettings({ burstCount: 3, burstInterval: 1, defaultAction: "copy", watchLimit: 5 });
+  await targetPage.locator(".region-snap-burst").click();
+  await targetPage.locator('#region-snap-root[data-run="burst"]').waitFor();
+  assert.equal(await targetPage.locator(".region-snap-burst").getAttribute("aria-pressed"), "true");
+  await targetPage.locator(".region-snap-toast", { hasText: "overlayBurstDone" }).waitFor({
+    timeout: 10_000,
+  });
+  assert.equal(await root.getAttribute("data-run"), "none", "the indicator goes when it is done");
+  assert.equal(seriesFiles.length, 3);
+  const burstStamp = /^region-snap-(\d{8}-\d{6})-01\.png$/.exec(seriesFiles[0].name)?.[1];
+  assert.ok(burstStamp, `unexpected burst file name ${seriesFiles[0].name}`);
+  assert.deepEqual(
+    seriesFiles.map((file) => file.name),
+    ["01", "02", "03"].map((shot) => `region-snap-${burstStamp}-${shot}.png`),
+  );
+  for (let index = 1; index < seriesFiles.length; index += 1) {
+    const gap = seriesFiles[index].at - seriesFiles[index - 1].at;
+    assert.ok(gap >= 800, `burst shots keep the interval, gap was ${gap} ms`);
+  }
+
+  // Capture on change: a change inside the region is saved once it settles, a quick run of
+  // changes is saved once, changes elsewhere are not, and it stops by itself at the limit.
+  seriesFiles.length = 0;
+  const changeRegion = (text) =>
+    targetPage.evaluate((value) => {
+      globalThis.document.querySelector("#target h1").textContent = value;
+    }, text);
+  await targetPage.locator(".region-snap-watch").click();
+  await targetPage.locator('#region-snap-root[data-run="watch"]').waitFor();
+  await targetPage.locator(".region-snap-toast", { hasText: "overlayWatchArmed" }).waitFor();
+  await targetPage.waitForTimeout(800);
+  assert.equal(seriesFiles.length, 0, "arming alone saves nothing");
+  for (let step = 0; step < 5; step += 1) {
+    await changeRegion(`Change ${step}`);
+    await targetPage.waitForTimeout(60);
+  }
+  await targetPage.waitForTimeout(1500);
+  assert.equal(seriesFiles.length, 1, "a quick run of changes is saved once");
+  assert.match(seriesFiles[0].name, /^region-snap-\d{8}-\d{6}-01\.png$/);
+  assert.equal(await targetPage.locator(".region-snap-run").innerText(), "1/5");
+  await targetPage.evaluate(() => {
+    const outside = globalThis.document.createElement("p");
+    outside.textContent = "elsewhere";
+    globalThis.document.body.appendChild(outside);
+  });
+  await targetPage.waitForTimeout(1200);
+  assert.equal(seriesFiles.length, 1, "a change outside the region is not saved");
+  for (let step = 2; step <= 5; step += 1) {
+    await changeRegion(`Change ${step}`);
+    await targetPage.waitForTimeout(1200);
+  }
+  await targetPage.locator(".region-snap-toast", { hasText: "overlayWatchLimit" }).waitFor();
+  assert.equal(seriesFiles.length, 5);
+  assert.equal(await root.getAttribute("data-run"), "none", "the limit ends the watch");
+  await changeRegion("After the limit");
+  await targetPage.waitForTimeout(1200);
+  assert.equal(seriesFiles.length, 5, "nothing is saved once the watch has ended");
+
+  // Escape stops a watch and keeps the region.
+  await targetPage.locator(".region-snap-watch").click();
+  await targetPage.locator('#region-snap-root[data-run="watch"]').waitFor();
+  await targetPage.keyboard.press("Escape");
+  await targetPage.locator(".region-snap-toast", { hasText: "overlaySeriesStopped" }).waitFor();
+  assert.equal(await root.getAttribute("data-run"), "none");
+  assert.equal(await root.getAttribute("data-mode"), "locked", "Escape only stops the watch");
+  await changeRegion("Smoke target");
+  await targetPage.waitForTimeout(1200);
+  assert.equal(seriesFiles.length, 5, "a stopped watch saves nothing");
+
   // Full page: the document is photographed a viewport at a time and stitched. Each stub
   // screenshot is filled with a colour that encodes the scroll offset it was taken at.
   await storeSettings({ captureDelay: 0, defaultAction: "download", format: "png" });
@@ -857,6 +932,11 @@ try {
   await options.locator('input[name="roundedCorners"]').uncheck();
   assert.equal(await options.locator('input[name="captureDelay"][value="0"]').isChecked(), true);
   await options.locator('input[name="captureDelay"][value="5"]').check();
+  assert.equal(await options.locator('input[name="burstCount"][value="5"]').isChecked(), true);
+  await options.locator('input[name="burstCount"][value="10"]').check();
+  await options.locator('input[name="burstInterval"][value="2"]').check();
+  assert.equal(await options.locator('input[name="watchLimit"][value="10"]').isChecked(), true);
+  await options.locator('input[name="watchLimit"][value="25"]').check();
   await options.locator('input[name="fileNamePrefix"]').fill("  my/shot?  ");
   await options.locator('input[name="fileNamePrefix"]').blur();
   await options.locator("#status", { hasText: /\S/ }).waitFor();
@@ -865,13 +945,20 @@ try {
     return stored.settings;
   });
   assert.deepEqual(storedSettings, {
+    burstCount: 10,
+    burstInterval: 2,
     captureDelay: 5,
     defaultAction: "download",
     fileNamePrefix: "myshot",
     format: "webp",
     roundedCorners: false,
+    watchLimit: 25,
   });
   await options.reload();
+  await options.locator("#file-name-example", { hasText: /\S/ }).waitFor();
+  assert.equal(await options.locator('input[name="burstCount"][value="10"]').isChecked(), true);
+  assert.equal(await options.locator('input[name="burstInterval"][value="2"]').isChecked(), true);
+  assert.equal(await options.locator('input[name="watchLimit"][value="25"]').isChecked(), true);
   assert.equal(await options.locator('input[name="format"][value="webp"]').isChecked(), true);
   assert.equal(await options.locator('input[name="fileNamePrefix"]').inputValue(), "myshot");
   assert.equal(await options.locator('input[name="captureDelay"][value="5"]').isChecked(), true);
@@ -892,7 +979,7 @@ try {
   assert.equal(version, manifest.version);
   assert.deepEqual(pageErrors, []);
   console.log(
-    `Smoke test passed for selection, marks, capture, delay, full page, scrolling capture, and popup v${version}.`,
+    `Smoke test passed for selection, marks, capture, delay, full page, scrolling capture, burst, capture on change, and popup v${version}.`,
   );
 } finally {
   await context.close();

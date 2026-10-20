@@ -122,5 +122,36 @@
   "optionsFileNameExample": { "message": "Example:" },
   "optionsReset": { "message": "Restore defaults" },
   "optionsSaved": { "message": "Saved" },
-  "optionsSaveError": { "message": "Could not save the settings" }
+  "optionsSaveError": { "message": "Could not save the settings" },
+  "overlayBurst": { "message": "Burst: take several shots in a row" },
+  "overlayBurstStop": { "message": "Stop the burst" },
+  "overlayWatch": { "message": "Capture each time the region changes" },
+  "overlayWatchStop": { "message": "Stop capturing on change" },
+  "overlayWatchArmed": {
+    "message": "Watching — each change is saved, up to $COUNT$ images. Esc stops.",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "overlayBurstDone": {
+    "message": "Burst done — $COUNT$ images saved",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "overlayWatchLimit": {
+    "message": "Stopped after $COUNT$ images",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "overlaySeriesStopped": {
+    "message": "Stopped — $COUNT$ images saved",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "optionsBurst": { "message": "Burst" },
+  "optionsBurstCount": { "message": "Shots" },
+  "optionsBurstInterval": { "message": "Time between shots" },
+  "optionsBurstHint": {
+    "message": "The burst button in the toolbar takes this many shots of the region, each saved as its own numbered file. Chrome may ask once to allow several downloads from the site."
+  },
+  "optionsWatch": { "message": "Capture on change" },
+  "optionsWatchLimit": { "message": "Stop after this many shots" },
+  "optionsWatchHint": {
+    "message": "While watching, the region is saved each time its content changes, up to this many shots. The toolbar button or Esc stops it sooner."
+  }
 }

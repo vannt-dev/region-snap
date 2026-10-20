@@ -120,6 +120,7 @@ test("picker command injects CSS and script only when needed", async () => {
     "shared.js",
     "geometry.js",
     "annotations.js",
+    "schedule.js",
     "content.js",
   ]);
   assert.equal(

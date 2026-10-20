@@ -13,7 +13,7 @@ Region Snap captures a user-selected portion of the currently visible browser ta
 - Region Snap does not store browsing history, page URLs, page content, screenshots, or form data.
 - A screenshot is held in memory only long enough to crop the selected region and create the image requested by the user.
 - The resulting image is downloaded directly to the user's device, or placed on the clipboard when the user chooses to copy it.
-- Region Snap stores four preferences on the device (image format, rounded corners, file name prefix, default action). They never leave the device.
+- Region Snap stores its preferences on the device (image format, rounded corners, file name prefix, default action, capture delay, burst and capture-on-change counts). They never leave the device.
 
 ## Permission usage
 

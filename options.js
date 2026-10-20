@@ -27,15 +27,21 @@ function localizeDocument() {
 
 function readForm() {
   return normalizeSettings({
+    burstCount: Number(form.elements.burstCount.value),
+    burstInterval: Number(form.elements.burstInterval.value),
     captureDelay: Number(form.elements.captureDelay.value),
     defaultAction: form.elements.defaultAction.value,
     fileNamePrefix: prefixInput.value,
     format: form.elements.format.value,
     roundedCorners: form.elements.roundedCorners.checked,
+    watchLimit: Number(form.elements.watchLimit.value),
   });
 }
 
 function fillForm(settings) {
+  form.elements.burstCount.value = String(settings.burstCount);
+  form.elements.burstInterval.value = String(settings.burstInterval);
+  form.elements.watchLimit.value = String(settings.watchLimit);
   form.elements.captureDelay.value = String(settings.captureDelay);
   form.elements.defaultAction.value = settings.defaultAction;
   form.elements.format.value = settings.format;

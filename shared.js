@@ -43,12 +43,21 @@
   // Seconds counted down before a region is captured; 0 captures at once.
   const CAPTURE_DELAYS = Object.freeze([0, 3, 5, 10]);
 
+  // A burst takes this many shots, this many seconds apart (never closer than Chrome allows).
+  const BURST_COUNTS = Object.freeze([3, 5, 10, 20]);
+  const BURST_INTERVALS = Object.freeze([1, 2, 5]);
+  // Capturing on change stops by itself after this many shots.
+  const WATCH_LIMITS = Object.freeze([5, 10, 25, 50]);
+
   const DEFAULT_SETTINGS = Object.freeze({
+    burstCount: 5,
+    burstInterval: 1,
     captureDelay: 0,
     defaultAction: "download",
     fileNamePrefix: "region-snap",
     format: "png",
     roundedCorners: true,
+    watchLimit: 10,
   });
 
   const FILE_NAME_PREFIX_MAX_LENGTH = 60;
@@ -71,7 +80,11 @@
   // anything there, so every field falls back to its default on its own.
   function normalizeSettings(raw) {
     const value = raw && typeof raw === "object" ? raw : {};
+    const pick = (key, allowed) =>
+      allowed.includes(value[key]) ? value[key] : DEFAULT_SETTINGS[key];
     return {
+      burstCount: pick("burstCount", BURST_COUNTS),
+      burstInterval: pick("burstInterval", BURST_INTERVALS),
       captureDelay: CAPTURE_DELAYS.includes(value.captureDelay)
         ? value.captureDelay
         : DEFAULT_SETTINGS.captureDelay,
@@ -84,20 +97,25 @@
         typeof value.roundedCorners === "boolean"
           ? value.roundedCorners
           : DEFAULT_SETTINGS.roundedCorners,
+      watchLimit: pick("watchLimit", WATCH_LIMITS),
     };
   }
 
-  function buildFileName(settings, date) {
+  // `shot` numbers one image of a series; the series shares the date of its first shot.
+  function buildFileName(settings, date, shot = "") {
     const pad = (number) => String(number).padStart(2, "0");
     const stamp =
       `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}` +
       `-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
     const { fileNamePrefix, format } = normalizeSettings(settings);
-    return `${fileNamePrefix}-${stamp}.${IMAGE_FORMATS[format].extension}`;
+    const suffix = shot ? `-${shot}` : "";
+    return `${fileNamePrefix}-${stamp}${suffix}.${IMAGE_FORMATS[format].extension}`;
   }
 
   const api = Object.freeze({
     ALLOWED_PROTOCOLS: Object.freeze(["http:", "https:", "file:"]),
+    BURST_COUNTS,
+    BURST_INTERVALS,
     CAPTURE_ACTIONS,
     CAPTURE_DELAYS,
     COMMAND_TO_MESSAGE,
@@ -108,6 +126,7 @@
     MESSAGE,
     SETTINGS_KEY,
     STATE,
+    WATCH_LIMITS,
     buildFileName,
     normalizeSettings,
   });
