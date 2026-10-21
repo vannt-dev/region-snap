@@ -11,7 +11,7 @@ permissions:
 jobs:
   extension:
     name: Build Chrome Extension
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       id-token: write
@@ -110,7 +110,7 @@ jobs:
     name: Publish GitHub Release
     if: github.ref_type == 'tag'
     needs: [extension, desktop]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - name: Download release artifacts
         uses: actions/download-artifact@v8

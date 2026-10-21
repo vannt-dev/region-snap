@@ -16,7 +16,7 @@ concurrency:
 jobs:
   quality:
     name: Quality, Test, Build, Package
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -39,7 +39,7 @@ jobs:
 
   smoke:
     name: Chromium Extension Smoke Test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout
         uses: actions/checkout@v7
