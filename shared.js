@@ -31,6 +31,9 @@
   });
 
   const SETTINGS_KEY = "settings";
+  // The colour last picked in the overlay's toolbar, kept apart from the settings page's
+  // settings, which that page writes whole.
+  const MARK_COLOR_KEY = "markColor";
 
   const IMAGE_FORMATS = Object.freeze({
     png: Object.freeze({ extension: "png", mime: "image/png" }),
@@ -123,6 +126,7 @@
     DEFAULT_SHORTCUTS,
     FILE_NAME_PREFIX_MAX_LENGTH,
     IMAGE_FORMATS,
+    MARK_COLOR_KEY,
     MESSAGE,
     SETTINGS_KEY,
     STATE,

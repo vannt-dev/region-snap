@@ -30,6 +30,11 @@ anything else is not published by vannt-dev.
   starts a new line and `Esc` cancels. Click a note to change it, drag it to move it, and pick
   small, medium or large with the `A` button. **Steps** `①` drop numbered circles 1, 2, 3… with
   each click; undo removes the last one and the next click reuses its number.
+- **Highlight** `▬` tints an area like a highlighter pen: the text under it still reads, on the
+  page and in the image. While a tool that draws in colour is held, the toolbar offers five
+  colours (red, yellow, green, blue, black) for the arrows, boxes, highlights, notes and steps
+  that follow, and for the note being typed. The last colour picked is remembered for the next
+  region and other pages; numbers and note outlines switch to dark ink on light colours.
 - **Capture full page** (popup, or `Alt+Shift+F`) scrolls the document a viewport at a time and
   stitches the slices into one image, without the scrollbar. A fixed header is kept in the first
   slice and a fixed footer in the last instead of repeating down the image; sticky elements sit
