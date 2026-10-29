@@ -23,7 +23,7 @@ Key features:
 - One-click element selection and free-form region selection
 - Move and resize controls with keyboard fine-tuning
 - Live page interaction while the capture region stays locked
-- Marks before capturing: arrows, boxes, hidden areas, text notes and numbered steps
+- Marks before capturing: arrows, boxes, highlights, hidden areas, text notes and numbered steps, in five colours
 - Full-page capture, and capture of a scrolling panel or an element taller than the window
 - Burst shots and capture on change, saved as numbered files
 - Copy to the clipboard, a capture delay, and PNG, JPEG or WebP output
