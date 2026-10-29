@@ -398,6 +398,121 @@ try {
   for (let left = 4; left > 0; left -= 1) await targetPage.locator(".region-snap-undo").click();
   assert.equal(await targetPage.locator(".region-snap-undo").isDisabled(), true);
 
+  // Colours and the highlighter: the colours show while a tool that uses one is held, the pick
+  // is stored for the next page, and a highlight tints the image without hiding what is under it.
+  // The highlighter starts yellow and keeps its own colour; the other tools start red.
+  await evaluateIsolated(`
+    globalThis.__stored = {};
+    globalThis.chrome.storage = {
+      local: {
+        get: async () => ({}),
+        set: async (items) => Object.assign(globalThis.__stored, items),
+      },
+    };
+  `);
+  const colors = targetPage.locator(".region-snap-colors");
+  const swatch = (name) => targetPage.locator(`.region-snap-color[data-color="${name}"]`);
+  assert.equal(await colors.isVisible(), false, "no colours without a tool");
+  await tool("hide").click();
+  assert.equal(await colors.isVisible(), false, "a hidden area has no colour");
+  await tool("highlight").click();
+  assert.equal(await root.getAttribute("data-tool"), "highlight");
+  assert.equal(await colors.isVisible(), true, "the colours show with the highlighter");
+  assert.equal(await swatch("yellow").getAttribute("aria-pressed"), "true", "a yellow highlighter");
+  assert.equal(await swatch("red").getAttribute("aria-pressed"), "false");
+  const stored = async () =>
+    JSON.parse((await evaluateIsolated("JSON.stringify(globalThis.__stored)")).result.value);
+  const stripeY = Math.round(at(0, 0.3).y);
+  await drag(at(0.1, 0.2), at(0.5, 0.4));
+  const highlightRect = targetPage.locator(".region-snap-mark-svg rect.region-snap-highlight");
+  assert.equal(await highlightRect.count(), 1);
+  assert.ok(
+    Number(
+      await highlightRect.evaluate((element) => globalThis.getComputedStyle(element).fillOpacity),
+    ) < 0.6,
+    "the highlight is see-through on the page",
+  );
+  await tool("box").click();
+  assert.equal(await swatch("red").getAttribute("aria-pressed"), "true", "a box starts red");
+  await swatch("blue").click();
+  assert.equal(await swatch("blue").getAttribute("aria-pressed"), "true");
+  assert.deepEqual(await stored(), { markColor: "#3b82f6" }, "the colour is remembered");
+  await drag(at(0.6, 0.6), at(0.9, 0.9));
+  assert.equal(await targetPage.locator(".region-snap-mark-svg rect").count(), 2);
+  await tool("highlight").click();
+  assert.equal(
+    await swatch("yellow").getAttribute("aria-pressed"),
+    "true",
+    "picking blue for a box leaves the highlighter yellow",
+  );
+
+  // A white screenshot with one black row of "text" running through the highlight.
+  await evaluateIsolated(`(() => {
+    const canvas = globalThis.document.createElement("canvas");
+    canvas.width = ${viewport.width};
+    canvas.height = ${viewport.height};
+    const context = canvas.getContext("2d");
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = "#000000";
+    context.fillRect(0, ${stripeY}, canvas.width, 6);
+    globalThis.__captureDataUrl = canvas.toDataURL("image/png");
+  })()`);
+  const colouredPromise = targetPage.waitForEvent("download");
+  await targetPage.locator(".region-snap-capture").click();
+  const coloured = await colouredPromise;
+  const colouredBase64 = (await fs.readFile(await coloured.path())).toString("base64");
+  await evaluateIsolated("globalThis.__captureDataUrl = null");
+  const colourProbes = {
+    highlight: at(0.3, 0.25),
+    textUnderHighlight: { x: at(0.3, 0).x, y: stripeY + 3 },
+    outsideHighlight: at(0.3, 0.5),
+    blueBox: at(0.6, 0.75),
+  };
+  const colourPixels = await targetPage.evaluate(
+    async ({ base64, points, origin }) => {
+      const blob = await (await globalThis.fetch(`data:image/png;base64,${base64}`)).blob();
+      const bitmap = await globalThis.createImageBitmap(blob);
+      const canvas = globalThis.document.createElement("canvas");
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      const context = canvas.getContext("2d");
+      context.drawImage(bitmap, 0, 0);
+      const result = {};
+      for (const [name, point] of Object.entries(points)) {
+        result[name] = Array.from(
+          context.getImageData(Math.round(point.x - origin.x), Math.round(point.y - origin.y), 1, 1)
+            .data,
+        );
+      }
+      return result;
+    },
+    { base64: colouredBase64, points: colourProbes, origin: { x: region.x, y: region.y } },
+  );
+  // Yellow (250, 204, 21) at 35% over white is about (253, 237, 173).
+  const [hr, hg, hb] = colourPixels.highlight;
+  assert.ok(
+    hr > 240 && hg > 225 && hg < 250 && hb > 150 && hb < 195,
+    `the highlight tints the image yellow, got ${colourPixels.highlight}`,
+  );
+  assert.ok(
+    colourPixels.textUnderHighlight.slice(0, 3).every((channel) => channel < 120),
+    `the text under a highlight stays dark, got ${colourPixels.textUnderHighlight}`,
+  );
+  assert.deepEqual(colourPixels.outsideHighlight, [255, 255, 255, 255]);
+  assert.deepEqual(colourPixels.blueBox, [59, 130, 246, 255], "the box is drawn in blue");
+
+  // A colour picked with the highlighter held is the highlighter's alone.
+  await swatch("green").click();
+  assert.deepEqual(await stored(), { markColor: "#3b82f6", highlightColor: "#22c55e" });
+  await tool("arrow").click();
+  assert.equal(await swatch("blue").getAttribute("aria-pressed"), "true", "the arrow stays blue");
+
+  await targetPage.keyboard.press("Escape");
+  await targetPage.locator(".region-snap-undo").click();
+  await targetPage.locator(".region-snap-undo").click();
+  assert.equal(await targetPage.locator(".region-snap-undo").isDisabled(), true);
+
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   const downloadsBeforeCopy = downloadCount;
   await targetPage.locator(".region-snap-copy").click();

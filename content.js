@@ -15,7 +15,16 @@
     return;
   }
 
-  const { IMAGE_FORMATS, MESSAGE, SETTINGS_KEY, STATE, buildFileName, normalizeSettings } = Shared;
+  const {
+    IMAGE_FORMATS,
+    HIGHLIGHT_COLOR_KEY,
+    MARK_COLOR_KEY,
+    MESSAGE,
+    SETTINGS_KEY,
+    STATE,
+    buildFileName,
+    normalizeSettings,
+  } = Shared;
   const MIN_SIZE = 8;
   const LOSSY_QUALITY = 0.92;
   // Chrome allows two captureVisibleTab calls a second; full-page slices keep clear of that.
@@ -43,7 +52,8 @@
   let hasShownLockedHint = false;
   let hasShownMarkHint = false;
   const shownToolHints = new Set();
-  // Arrows, boxes, hidden areas, notes and steps over the locked region, in viewport coordinates.
+  // Arrows, boxes, highlights, hidden areas, notes and steps over the locked region, in viewport
+  // coordinates.
   let marks = [];
   let activeTool = null;
   let markStart = null;
@@ -54,6 +64,12 @@
   // The note being typed: its textarea, where it sits, its size, and which mark it replaces.
   let editor = null;
   let textSize = "medium";
+  // The colour of the marks that follow. It outlives the region and is stored for other pages;
+  // `colorChoices` counts picks, so a stored colour read late does not undo a fresh one.
+  let markColor = Annotations.MARK_COLOR;
+  // The highlighter's own colour, yellow like a highlighter pen until another is picked for it.
+  let highlightColor = Annotations.HIGHLIGHT_COLOR;
+  let colorChoices = 0;
   // Set while a capture delay is counting down; calling it stops the countdown.
   let stopCountdown = null;
   // Set while a full-page or scrolling capture runs; Escape marks it cancelled.
@@ -75,21 +91,30 @@
   let markSvg;
   let undoButton;
   let textSizeButton;
+  let colorGroup;
   let burstButton;
   let watchButton;
   let runLabel;
   const handles = {};
 
   const SVG_NS = "http://www.w3.org/2000/svg";
-  const TOOL_GLYPHS = { arrow: "↗", box: "▢", hide: "▒", text: "T", step: "①" };
+  const TOOL_GLYPHS = { arrow: "↗", box: "▢", highlight: "▬", hide: "▒", text: "T", step: "①" };
   const TOOL_LABELS = {
     arrow: "overlayToolArrow",
     box: "overlayToolBox",
+    highlight: "overlayToolHighlight",
     hide: "overlayToolHide",
     text: "overlayToolText",
     step: "overlayToolStep",
   };
   const TOOL_HINTS = { text: "overlayTextHint", step: "overlayStepHint" };
+  const COLOR_LABELS = {
+    red: "overlayColorRed",
+    yellow: "overlayColorYellow",
+    green: "overlayColorGreen",
+    blue: "overlayColorBlue",
+    black: "overlayColorBlack",
+  };
   const TEXT_SIZE_ORDER = ["small", "medium", "large"];
   const TEXT_SIZE_LABELS = {
     small: "overlayTextSmall",
@@ -98,7 +123,8 @@
   };
   // A press that travels less than this is a click on a note, not a drag of it.
   const CLICK_SLOP = 3;
-  const TOOLBAR_WIDTH = 680;
+  // About the widest the toolbar gets: with a tool held it also shows the mark colours.
+  const TOOLBAR_WIDTH = 840;
   // Capture on change waits for the region to be still this long, but never longer than the
   // second value after the first change, so content that never settles is still captured.
   const WATCH_QUIET_MS = 400;
@@ -155,6 +181,14 @@
         (tool) =>
           `<button class="region-snap-tool" type="button" data-tool="${tool}" aria-pressed="false" title="${t(TOOL_LABELS[tool])}" aria-label="${t(TOOL_LABELS[tool])}">${TOOL_GLYPHS[tool]}</button>`,
       ).join("")}
+      <span class="region-snap-colors" role="group" aria-label="${t("overlayColor")}">
+        ${Object.keys(Annotations.MARK_COLORS)
+          .map(
+            (name) =>
+              `<button class="region-snap-color" type="button" data-color="${name}" aria-pressed="false" title="${t(COLOR_LABELS[name])}" aria-label="${t(COLOR_LABELS[name])}"></button>`,
+          )
+          .join("")}
+      </span>
       <button class="region-snap-text-size" type="button" data-size="${textSize}">A</button>
       <button class="region-snap-undo" type="button" disabled title="${t("overlayUndo")}" aria-label="${t("overlayUndo")}">↶</button>
       <button class="region-snap-scroll" type="button" title="${t("overlayScrollCapture")}" aria-label="${t("overlayScrollCapture")}">⇣</button>
@@ -169,10 +203,12 @@
     sizeLabel = toolbar.querySelector(".region-snap-size");
     undoButton = toolbar.querySelector(".region-snap-undo");
     textSizeButton = toolbar.querySelector(".region-snap-text-size");
+    colorGroup = toolbar.querySelector(".region-snap-colors");
     burstButton = toolbar.querySelector(".region-snap-burst");
     watchButton = toolbar.querySelector(".region-snap-watch");
     runLabel = toolbar.querySelector(".region-snap-run");
     labelTextSize();
+    labelColors();
 
     // The layer is the region's own box and clips what is drawn; the surface inside it is
     // shifted back so its coordinates are the viewport's, the same ones the marks use.
@@ -239,6 +275,17 @@
     textSizeButton.addEventListener("click", (event) => {
       if (event.isTrusted) cycleTextSize();
     });
+    for (const button of colorGroup.querySelectorAll(".region-snap-color")) {
+      // Set here rather than in the markup, which a page's style policy may refuse.
+      button.style.setProperty("--rs-swatch", Annotations.MARK_COLORS[button.dataset.color]);
+      // Like the size button, a colour must not take the focus from a note being typed.
+      button.addEventListener("mousedown", (event) => event.preventDefault());
+      button.addEventListener("click", (event) => {
+        if (event.isTrusted)
+          setMarkColor(Annotations.MARK_COLORS[event.currentTarget.dataset.color]);
+      });
+    }
+    loadMarkColor();
     markLayer.addEventListener("mousedown", onMarkDown);
     gripButton.addEventListener("mousedown", onMoveGripDown);
     Object.values(handles).forEach((handle) => handle.addEventListener("mousedown", onHandleDown));
@@ -247,7 +294,7 @@
   function removeOverlay() {
     root?.remove();
     root = dim = border = toolbar = gripButton = sizeLabel = toast = null;
-    markLayer = markSurface = markSvg = undoButton = textSizeButton = null;
+    markLayer = markSurface = markSvg = undoButton = textSizeButton = colorGroup = null;
     burstButton = watchButton = runLabel = null;
     editor = null;
     textDrag = null;
@@ -316,6 +363,13 @@
     return element;
   }
 
+  // Gives an element of a mark its colour, and the ink that reads on it, through CSS variables.
+  function paint(element, color) {
+    element.style.setProperty("--rs-mark", Annotations.markColor(color), "important");
+    element.style.setProperty("--rs-ink", Annotations.markInk(color), "important");
+    return element;
+  }
+
   // Redraws the marks from scratch. There are only ever a handful, and it runs when one is
   // added, removed or dragged out, never on a pointer move over the page.
   function renderMarks() {
@@ -326,6 +380,8 @@
       element.remove();
     }
     const steps = [];
+    // Highlights sit under the lines and boxes, as they do in the image.
+    let highlights = null;
 
     for (const mark of visible) {
       // A note being edited shows as its textarea instead.
@@ -339,7 +395,7 @@
         note.style.setProperty("top", `${mark.y}px`, "important");
         note.style.setProperty("font", Annotations.textFont(mark.size), "important");
         note.style.setProperty("line-height", String(Annotations.TEXT_LINE_HEIGHT), "important");
-        markSurface.appendChild(note);
+        markSurface.appendChild(paint(note, mark.color));
       } else if (mark.tool === "step") {
         steps.push(mark);
       } else if (mark.tool === "hide") {
@@ -350,41 +406,70 @@
         cover.style.setProperty("width", `${mark.width}px`, "important");
         cover.style.setProperty("height", `${mark.height}px`, "important");
         markSurface.insertBefore(cover, markSvg);
+      } else if (mark.tool === "highlight") {
+        if (!highlights) {
+          highlights = svgElement("g", {});
+          markSvg.prepend(highlights);
+        }
+        const area = svgElement("rect", {
+          class: "region-snap-highlight",
+          x: mark.left,
+          y: mark.top,
+          width: mark.width,
+          height: mark.height,
+        });
+        area.style.setProperty("--rs-alpha", String(Annotations.HIGHLIGHT_ALPHA), "important");
+        highlights.appendChild(paint(area, Annotations.colorOf(mark)));
       } else if (mark.tool === "box") {
         markSvg.appendChild(
-          svgElement("rect", {
-            x: mark.left,
-            y: mark.top,
-            width: mark.width,
-            height: mark.height,
-            rx: Annotations.BOX_RADIUS,
-          }),
+          paint(
+            svgElement("rect", {
+              x: mark.left,
+              y: mark.top,
+              width: mark.width,
+              height: mark.height,
+              rx: Annotations.BOX_RADIUS,
+            }),
+            mark.color,
+          ),
         );
       } else {
         const head = Annotations.arrowHead(mark);
         if (!head) continue;
         markSvg.append(
-          svgElement("line", {
-            x1: mark.x1,
-            y1: mark.y1,
-            x2: head.shaftEnd.x,
-            y2: head.shaftEnd.y,
-          }),
-          svgElement("polygon", {
-            points: [head.tip, head.left, head.right]
-              .map((point) => `${point.x},${point.y}`)
-              .join(" "),
-          }),
+          paint(
+            svgElement("line", {
+              x1: mark.x1,
+              y1: mark.y1,
+              x2: head.shaftEnd.x,
+              y2: head.shaftEnd.y,
+            }),
+            mark.color,
+          ),
+          paint(
+            svgElement("polygon", {
+              points: [head.tip, head.left, head.right]
+                .map((point) => `${point.x},${point.y}`)
+                .join(" "),
+            }),
+            mark.color,
+          ),
         );
       }
     }
     // Steps sit on top of the lines and boxes, as they do in the image.
     for (const mark of steps) {
       markSvg.append(
-        svgElement("circle", { cx: mark.x, cy: mark.y, r: Annotations.STEP_RADIUS }),
-        Object.assign(svgElement("text", { x: mark.x, y: mark.y }), {
-          textContent: String(mark.number),
-        }),
+        paint(
+          svgElement("circle", { cx: mark.x, cy: mark.y, r: Annotations.STEP_RADIUS }),
+          mark.color,
+        ),
+        paint(
+          Object.assign(svgElement("text", { x: mark.x, y: mark.y }), {
+            textContent: String(mark.number),
+          }),
+          mark.color,
+        ),
       );
     }
     if (editor) markSurface.appendChild(editor.element);
@@ -413,9 +498,68 @@
     labelTextSize();
   }
 
+  // The colour the held tool draws with: the highlighter has its own, the other tools share one.
+  function toolColor() {
+    return activeTool === "highlight" ? highlightColor : markColor;
+  }
+
+  // Shows which colour is chosen: the note's while one is typed, otherwise the held tool's.
+  function labelColors() {
+    if (!colorGroup) return;
+    const current = editor?.color || toolColor();
+    for (const button of colorGroup.querySelectorAll(".region-snap-color")) {
+      const chosen = Annotations.MARK_COLORS[button.dataset.color] === current;
+      button.setAttribute("aria-pressed", String(chosen));
+    }
+  }
+
+  // Sets the colour of the held tool's next marks, and of the note being typed, and remembers
+  // it. With the highlighter held only the highlighter's colour changes.
+  function setMarkColor(color) {
+    colorChoices += 1;
+    let stored;
+    if (activeTool === "highlight" && !editor) {
+      highlightColor = Annotations.markColor(color, Annotations.HIGHLIGHT_COLOR);
+      stored = { [HIGHLIGHT_COLOR_KEY]: highlightColor };
+    } else {
+      markColor = Annotations.markColor(color);
+      stored = { [MARK_COLOR_KEY]: markColor };
+    }
+    if (editor) {
+      editor.color = markColor;
+      styleEditor();
+      editor.element.focus({ preventScroll: true });
+    }
+    labelColors();
+    try {
+      Promise.resolve(chrome.storage.local.set(stored)).catch(() => {});
+    } catch {
+      // Without the storage API the colour lasts while the page is open.
+    }
+  }
+
+  async function loadMarkColor() {
+    const choices = colorChoices;
+    try {
+      const stored = await chrome.storage.local.get([MARK_COLOR_KEY, HIGHLIGHT_COLOR_KEY]);
+      if (!stored || choices !== colorChoices) return;
+      if (stored[MARK_COLOR_KEY]) markColor = Annotations.markColor(stored[MARK_COLOR_KEY]);
+      if (stored[HIGHLIGHT_COLOR_KEY]) {
+        highlightColor = Annotations.markColor(
+          stored[HIGHLIGHT_COLOR_KEY],
+          Annotations.HIGHLIGHT_COLOR,
+        );
+      }
+      labelColors();
+    } catch {
+      // Keeps the colour already in use.
+    }
+  }
+
   function styleEditor() {
     if (!editor) return;
-    const { element, point, size } = editor;
+    const { element, point, size, color } = editor;
+    paint(element, color);
     element.style.setProperty("left", `${point.x}px`, "important");
     element.style.setProperty("top", `${point.y}px`, "important");
     element.style.setProperty("font", Annotations.textFont(size), "important");
@@ -442,7 +586,13 @@
     element.spellcheck = false;
     element.setAttribute("aria-label", t("overlayToolText"));
     element.value = original?.text || "";
-    editor = { element, point: { ...point }, size: original?.size || textSize, original };
+    editor = {
+      element,
+      point: { ...point },
+      size: original?.size || textSize,
+      color: original ? Annotations.markColor(original.color) : markColor,
+      original,
+    };
     // Keys typed into the note are not the page's business.
     for (const type of ["keyup", "keypress"]) {
       element.addEventListener(type, (event) => event.stopPropagation());
@@ -451,6 +601,7 @@
     element.addEventListener("blur", () => commitEditor());
     styleEditor();
     labelTextSize();
+    labelColors();
     renderMarks();
     element.focus({ preventScroll: true });
     element.setSelectionRange(element.value.length, element.value.length);
@@ -459,9 +610,9 @@
   // Keeps what was typed. A note emptied out is removed; a new one left empty is dropped.
   function commitEditor() {
     if (!editor) return;
-    const { element, point, size, original } = editor;
+    const { element, point, size, color, original } = editor;
     editor = null;
-    const mark = rect ? Annotations.createTextMark(point, element.value, size, rect) : null;
+    const mark = rect ? Annotations.createTextMark(point, element.value, size, rect, color) : null;
     const index = original ? marks.indexOf(original) : -1;
     if (index >= 0) {
       marks = mark
@@ -472,6 +623,7 @@
     }
     element.remove();
     labelTextSize();
+    labelColors();
     renderMarks();
   }
 
@@ -482,6 +634,7 @@
     editor = null;
     element.remove();
     labelTextSize();
+    labelColors();
     renderMarks();
   }
 
@@ -495,6 +648,7 @@
     for (const button of toolbar.querySelectorAll(".region-snap-tool")) {
       button.setAttribute("aria-pressed", String(button.dataset.tool === activeTool));
     }
+    labelColors();
     if (TOOL_HINTS[activeTool]) {
       if (!shownToolHints.has(activeTool)) showToast(t(TOOL_HINTS[activeTool]));
       shownToolHints.add(activeTool);
@@ -550,6 +704,7 @@
       mark.text,
       mark.size,
       rect,
+      mark.color,
     );
     if (!moved) return;
     marks = marks.map((item) => (item === mark ? moved : item));
@@ -569,6 +724,7 @@
       markStart,
       { x: event.clientX, y: event.clientY },
       rect,
+      toolColor(),
     );
     renderMarks();
   }
@@ -587,6 +743,7 @@
             markStart,
             { x: event.clientX, y: event.clientY },
             rect,
+            toolColor(),
           )
         : null;
     if (mark) marks = [...marks, mark];
@@ -614,7 +771,7 @@
     const drag = textDrag;
     endMarkPress();
     if (activeTool === "step") {
-      const step = Annotations.createStepMark(point, marks, rect);
+      const step = Annotations.createStepMark(point, marks, rect, markColor);
       if (step) marks = [...marks, step];
       renderMarks();
     } else if (drag?.moved) {

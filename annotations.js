@@ -1,10 +1,24 @@
 /*! SPDX-License-Identifier: MIT | Copyright (c) 2026 vannt-dev | github.com/vannt-dev/region-snap */
 ((scope) => {
-  const TOOLS = Object.freeze(["arrow", "box", "hide", "text", "step"]);
+  const TOOLS = Object.freeze(["arrow", "box", "highlight", "hide", "text", "step"]);
   // Placed with a click instead of drawn with a drag.
   const CLICK_TOOLS = Object.freeze(["text", "step"]);
-  const MARK_COLOR = "#ef4444";
+  // The colours a mark can take; red is the default. A hidden area has no colour.
+  const MARK_COLORS = Object.freeze({
+    red: "#ef4444",
+    yellow: "#facc15",
+    green: "#22c55e",
+    blue: "#3b82f6",
+    black: "#111827",
+  });
+  const MARK_COLOR = MARK_COLORS.red;
+  // A highlight starts yellow, like a highlighter pen, and keeps a colour of its own.
+  const HIGHLIGHT_COLOR = MARK_COLORS.yellow;
   const HALO_COLOR = "#ffffff";
+  // Outline and numbers on a light colour, where white would not read.
+  const DARK_INK = "#111827";
+  // A highlight lets this much of its colour through, so the text under it still reads.
+  const HIGHLIGHT_ALPHA = 0.35;
   const LINE_WIDTH = 3;
   const ARROW_HEAD = 14;
   const BOX_RADIUS = 4;
@@ -24,6 +38,30 @@
 
   const clamp = (value, min, max) => Math.min(Math.max(value, min), Math.max(min, max));
 
+  // A stored or passed colour is untrusted; only the palette's colours are drawn.
+  function markColor(value, fallback = MARK_COLOR) {
+    return Object.values(MARK_COLORS).includes(value) ? value : fallback;
+  }
+
+  // The colour a mark is drawn in: its own, or its tool's default.
+  function colorOf(mark) {
+    return markColor(mark.color, mark.tool === "highlight" ? HIGHLIGHT_COLOR : MARK_COLOR);
+  }
+
+  // White on dark colours, dark on light ones, by relative luminance.
+  function markInk(color) {
+    const [red, green, blue] = [1, 3, 5].map((index) => {
+      const channel = parseInt(markColor(color).slice(index, index + 2), 16) / 255;
+      return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * red + 0.7152 * green + 0.0722 * blue > 0.4 ? DARK_INK : HALO_COLOR;
+  }
+
+  // Adds the colour to a new mark only when one was chosen, so marks made without one stay as
+  // they were and are drawn in the default colour.
+  const withColor = (mark, color) =>
+    color === undefined ? mark : { ...mark, color: colorOf({ ...mark, color }) };
+
   function textFont(size, scale = 1) {
     const pixels = (TEXT_SIZES[size] || TEXT_SIZES.medium) * scale;
     return `${TEXT_WEIGHT} ${pixels}px ${TEXT_FONT_FAMILY}`;
@@ -36,17 +74,20 @@
   // A text mark is anchored at its top-left corner, which is kept inside the region; the text
   // itself may run past the edge, where the capture cuts it like anything else. Blank text is
   // no mark, so committing an emptied note removes it.
-  function createTextMark(point, text, size, bounds) {
+  function createTextMark(point, text, size, bounds, color) {
     if (!point || !bounds || typeof text !== "string") return null;
     const value = text.replace(/\r\n?/g, "\n");
     if (!value.trim()) return null;
-    return {
-      tool: "text",
-      x: clamp(point.x, bounds.left, bounds.left + bounds.width),
-      y: clamp(point.y, bounds.top, bounds.top + bounds.height),
-      text: value,
-      size: Object.hasOwn(TEXT_SIZES, size) ? size : "medium",
-    };
+    return withColor(
+      {
+        tool: "text",
+        x: clamp(point.x, bounds.left, bounds.left + bounds.width),
+        y: clamp(point.y, bounds.top, bounds.top + bounds.height),
+        text: value,
+        size: Object.hasOwn(TEXT_SIZES, size) ? size : "medium",
+      },
+      color,
+    );
   }
 
   // The next step is one more than the highest step still there, so removing the last step
@@ -60,20 +101,24 @@
   }
 
   // A step is a numbered circle centred on the click, moved in so the whole circle shows.
-  function createStepMark(point, marks, bounds) {
+  function createStepMark(point, marks, bounds, color) {
     if (!point || !bounds) return null;
-    return {
-      tool: "step",
-      x: clamp(point.x, bounds.left + STEP_RADIUS, bounds.left + bounds.width - STEP_RADIUS),
-      y: clamp(point.y, bounds.top + STEP_RADIUS, bounds.top + bounds.height - STEP_RADIUS),
-      number: nextStepNumber(marks),
-    };
+    return withColor(
+      {
+        tool: "step",
+        x: clamp(point.x, bounds.left + STEP_RADIUS, bounds.left + bounds.width - STEP_RADIUS),
+        y: clamp(point.y, bounds.top + STEP_RADIUS, bounds.top + bounds.height - STEP_RADIUS),
+        number: nextStepNumber(marks),
+      },
+      color,
+    );
   }
 
   // Marks live in viewport coordinates, like the region itself: moving or resizing the region
   // leaves them on the content they were drawn over. `bounds` is the region; a mark is kept
-  // inside it, and one too small to be deliberate is dropped.
-  function createMark(tool, start, end, bounds) {
+  // inside it, and one too small to be deliberate is dropped. A highlight is a rectangle like a
+  // box; a hidden area takes no colour.
+  function createMark(tool, start, end, bounds, color) {
     if (!TOOLS.includes(tool) || CLICK_TOOLS.includes(tool) || !start || !end || !bounds) {
       return null;
     }
@@ -90,13 +135,14 @@
 
     if (tool === "arrow") {
       if (Math.hypot(to.x - from.x, to.y - from.y) < MIN_MARK_SIZE) return null;
-      return { tool, x1: from.x, y1: from.y, x2: to.x, y2: to.y };
+      return withColor({ tool, x1: from.x, y1: from.y, x2: to.x, y2: to.y }, color);
     }
 
     const width = Math.abs(to.x - from.x);
     const height = Math.abs(to.y - from.y);
     if (width < MIN_MARK_SIZE || height < MIN_MARK_SIZE) return null;
-    return { tool, left: Math.min(from.x, to.x), top: Math.min(from.y, to.y), width, height };
+    const area = { tool, left: Math.min(from.x, to.x), top: Math.min(from.y, to.y), width, height };
+    return tool === "hide" ? area : withColor(area, color);
   }
 
   // The head of an arrow ending at (x2, y2): its tip, its two barbs, and the point where the
@@ -128,21 +174,27 @@
       };
     }
     if (mark.tool === "arrow") {
-      return {
-        tool: mark.tool,
-        x1: (mark.x1 - origin.left) * scale.x,
-        y1: (mark.y1 - origin.top) * scale.y,
-        x2: (mark.x2 - origin.left) * scale.x,
-        y2: (mark.y2 - origin.top) * scale.y,
-      };
+      return withColor(
+        {
+          tool: mark.tool,
+          x1: (mark.x1 - origin.left) * scale.x,
+          y1: (mark.y1 - origin.top) * scale.y,
+          x2: (mark.x2 - origin.left) * scale.x,
+          y2: (mark.y2 - origin.top) * scale.y,
+        },
+        mark.color,
+      );
     }
-    return {
-      tool: mark.tool,
-      left: (mark.left - origin.left) * scale.x,
-      top: (mark.top - origin.top) * scale.y,
-      width: mark.width * scale.x,
-      height: mark.height * scale.y,
-    };
+    return withColor(
+      {
+        tool: mark.tool,
+        left: (mark.left - origin.left) * scale.x,
+        top: (mark.top - origin.top) * scale.y,
+        width: mark.width * scale.x,
+        height: mark.height * scale.y,
+      },
+      mark.color,
+    );
   }
 
   // The part of a hidden area that lies on the canvas, in whole pixels, or null when none does.
@@ -238,8 +290,8 @@
     context.textBaseline = "top";
     context.lineJoin = "round";
     context.lineWidth = TEXT_HALO * scale;
-    context.strokeStyle = HALO_COLOR;
-    context.fillStyle = MARK_COLOR;
+    context.strokeStyle = markInk(mark.color);
+    context.fillStyle = markColor(mark.color);
     lines.forEach((line, index) => context.strokeText(line, mark.x, top + index * lineHeight));
     lines.forEach((line, index) => context.fillText(line, mark.x, top + index * lineHeight));
     context.restore();
@@ -249,22 +301,23 @@
     context.save();
     context.beginPath();
     context.arc(mark.x, mark.y, STEP_RADIUS * scale, 0, Math.PI * 2);
-    context.fillStyle = MARK_COLOR;
+    context.fillStyle = markColor(mark.color);
     context.fill();
     context.lineWidth = STEP_BORDER * scale;
-    context.strokeStyle = HALO_COLOR;
+    context.strokeStyle = markInk(mark.color);
     context.stroke();
     context.font = stepFont(scale);
     context.textAlign = "center";
     context.textBaseline = "middle";
-    context.fillStyle = HALO_COLOR;
+    context.fillStyle = markInk(mark.color);
     context.fillText(String(mark.number), mark.x, mark.y);
     context.restore();
   }
 
   // Draws every mark onto the cropped image. `origin` is the region's corner in the viewport
   // and `scale` the image pixels per CSS pixel. Hidden areas go first, so an arrow or a box
-  // drawn across one stays sharp on top of it.
+  // drawn across one stays sharp on top of it; highlights come next, under the lines, and only
+  // tint what is under them.
   function drawMarks(context, canvas, marks, { origin, scale, createCanvas }) {
     if (!marks?.length) return;
     const output = marks.map((mark) => toOutput(mark, origin, scale));
@@ -276,13 +329,23 @@
       }
     }
 
+    for (const mark of output) {
+      if (mark.tool !== "highlight") continue;
+      context.save();
+      context.globalAlpha = HIGHLIGHT_ALPHA;
+      context.fillStyle = colorOf(mark);
+      context.fillRect(mark.left, mark.top, mark.width, mark.height);
+      context.restore();
+    }
+
     context.save();
-    context.strokeStyle = MARK_COLOR;
-    context.fillStyle = MARK_COLOR;
     context.lineWidth = LINE_WIDTH * unit;
     context.lineCap = "round";
     context.lineJoin = "round";
     for (const mark of output) {
+      if (mark.tool !== "arrow" && mark.tool !== "box") continue;
+      context.strokeStyle = markColor(mark.color);
+      context.fillStyle = markColor(mark.color);
       if (mark.tool === "arrow") drawArrow(context, mark, unit);
       if (mark.tool === "box") drawBox(context, mark, unit);
     }
@@ -300,8 +363,11 @@
     CLICK_TOOLS,
     HALO_COLOR,
     HIDE_BLOCK,
+    HIGHLIGHT_ALPHA,
+    HIGHLIGHT_COLOR,
     LINE_WIDTH,
     MARK_COLOR,
+    MARK_COLORS,
     MIN_MARK_SIZE,
     STEP_FONT_SIZE,
     STEP_RADIUS,
@@ -311,11 +377,14 @@
     TEXT_WEIGHT,
     TOOLS,
     arrowHead,
+    colorOf,
     createMark,
     createStepMark,
     createTextMark,
     drawMarks,
     hideArea,
+    markColor,
+    markInk,
     nextStepNumber,
     stepFont,
     textFont,

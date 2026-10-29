@@ -293,3 +293,150 @@ test("text and step numbers are drawn into the image at its resolution", () => {
     ],
   );
 });
+
+test("marks take a colour from the palette, and anything else falls back to red", () => {
+  const { MARK_COLORS, MARK_COLOR } = annotations;
+  assert.equal(MARK_COLOR, MARK_COLORS.red, "red stays the default colour");
+  assert.ok(Object.keys(MARK_COLORS).length >= 4 && Object.keys(MARK_COLORS).length <= 6);
+  for (const color of Object.values(MARK_COLORS)) assert.equal(annotations.markColor(color), color);
+  for (const value of ["#123456", "red", "", null, undefined, 42, "url(x)"]) {
+    assert.equal(annotations.markColor(value), MARK_COLOR, `${value} is not a mark colour`);
+  }
+});
+
+test("a colour chosen for a mark is kept on it, except on a hidden area", () => {
+  const blue = annotations.MARK_COLORS.blue;
+  const from = { x: 150, y: 80 };
+  const to = { x: 300, y: 200 };
+  assert.equal(annotations.createMark("box", from, to, region, blue).color, blue);
+  assert.equal(annotations.createMark("arrow", from, to, region, blue).color, blue);
+  assert.equal(annotations.createMark("highlight", from, to, region, blue).color, blue);
+  assert.equal(annotations.createMark("box", from, to, region, "#123456").color, "#ef4444");
+  assert.equal(
+    Object.hasOwn(annotations.createMark("hide", from, to, region, blue), "color"),
+    false,
+  );
+  assert.equal(annotations.createTextMark(from, "Hi", "small", region, blue).color, blue);
+  assert.equal(annotations.createStepMark(from, [], region, blue).color, blue);
+});
+
+test("a highlight is a rectangle like a box, and too thin a sliver is no mark", () => {
+  assert.ok(annotations.TOOLS.includes("highlight"));
+  assert.equal(annotations.CLICK_TOOLS.includes("highlight"), false);
+  assert.deepEqual(
+    annotations.createMark("highlight", { x: 300, y: 120 }, { x: 150, y: 100 }, region),
+    { tool: "highlight", left: 150, top: 100, width: 150, height: 20 },
+  );
+  assert.equal(
+    annotations.createMark("highlight", { x: 150, y: 100 }, { x: 300, y: 102 }, region),
+    null,
+  );
+});
+
+test("the colour goes with a mark into image pixels", () => {
+  const origin = { left: 100, top: 50 };
+  const scale = { x: 2, y: 2 };
+  const green = annotations.MARK_COLORS.green;
+  const highlight = { tool: "highlight", left: 150, top: 80, width: 40, height: 20, color: green };
+  assert.deepEqual(annotations.toOutput(highlight, origin, scale), {
+    tool: "highlight",
+    left: 100,
+    top: 60,
+    width: 80,
+    height: 40,
+    color: green,
+  });
+  const arrow = { tool: "arrow", x1: 100, y1: 50, x2: 300, y2: 150, color: green };
+  assert.equal(annotations.toOutput(arrow, origin, scale).color, green);
+});
+
+test("light colours get dark ink for step numbers and note outlines", () => {
+  const { MARK_COLORS, HALO_COLOR } = annotations;
+  assert.equal(annotations.markInk(MARK_COLORS.red), HALO_COLOR);
+  assert.equal(annotations.markInk(MARK_COLORS.blue), HALO_COLOR);
+  assert.equal(annotations.markInk(MARK_COLORS.black), HALO_COLOR);
+  assert.notEqual(annotations.markInk(MARK_COLORS.yellow), HALO_COLOR);
+});
+
+test("highlights are see-through, under the arrows and boxes and over hidden areas", () => {
+  const log = [];
+  const { MARK_COLORS } = annotations;
+  annotations.drawMarks(
+    recordingContext(log),
+    { width: 800, height: 600 },
+    [
+      { tool: "box", left: 150, top: 80, width: 40, height: 20, color: MARK_COLORS.blue },
+      { tool: "highlight", left: 120, top: 60, width: 100, height: 20, color: MARK_COLORS.yellow },
+      { tool: "hide", left: 200, top: 100, width: 140, height: 28 },
+    ],
+    {
+      origin: { left: 100, top: 50 },
+      scale: { x: 2, y: 2 },
+      createCanvas: (width, height) => ({
+        width,
+        height,
+        getContext: () => recordingContext(log, "scratch"),
+      }),
+    },
+  );
+  const main = log.filter(([name]) => name === "main");
+  const mosaic = main.findIndex(([, method]) => method === "drawImage");
+  const highlight = main.findIndex(([, method]) => method === "fillRect");
+  const box = main.findIndex(([, method]) => method === "stroke");
+  assert.ok(mosaic < highlight && highlight < box, "hidden area, then highlight, then box");
+  assert.deepEqual(main[highlight], ["main", "fillRect", 40, 20, 200, 40]);
+  const alpha = main.slice(0, highlight).findLast(([, method]) => method === "set:globalAlpha");
+  assert.ok(alpha && alpha[2] > 0 && alpha[2] < 0.6, "the text under a highlight shows through");
+  const fill = main.slice(0, highlight).findLast(([, method]) => method === "set:fillStyle");
+  assert.equal(fill[2], MARK_COLORS.yellow);
+  const stroke = main.slice(0, box).findLast(([, method]) => method === "set:strokeStyle");
+  assert.equal(stroke[2], MARK_COLORS.blue, "each mark is drawn in its own colour");
+});
+
+test("text and steps are drawn in their colour with contrasting ink", () => {
+  const log = [];
+  const { MARK_COLORS } = annotations;
+  annotations.drawMarks(
+    recordingContext(log),
+    { width: 800, height: 600 },
+    [
+      { tool: "text", x: 120, y: 60, text: "Hi", size: "medium", color: MARK_COLORS.green },
+      { tool: "step", x: 150, y: 100, number: 1, color: MARK_COLORS.yellow },
+    ],
+    { origin: { left: 100, top: 50 }, scale: { x: 1, y: 1 }, createCanvas: () => null },
+  );
+  const fills = log.filter(([, method]) => method === "set:fillStyle").map(([, , value]) => value);
+  assert.ok(fills.includes(MARK_COLORS.green), "the note is in its colour");
+  assert.ok(fills.includes(MARK_COLORS.yellow), "the step is in its colour");
+  assert.ok(
+    fills.includes(annotations.markInk(MARK_COLORS.yellow)),
+    "the number on a yellow step uses dark ink",
+  );
+});
+
+test("a highlight is yellow unless another colour is chosen for it", () => {
+  const { MARK_COLORS } = annotations;
+  assert.equal(annotations.HIGHLIGHT_COLOR, MARK_COLORS.yellow, "like a highlighter pen");
+  assert.equal(annotations.markColor("#123456", annotations.HIGHLIGHT_COLOR), MARK_COLORS.yellow);
+  assert.equal(
+    annotations.markColor(MARK_COLORS.blue, annotations.HIGHLIGHT_COLOR),
+    MARK_COLORS.blue,
+  );
+  const from = { x: 150, y: 80 };
+  const to = { x: 300, y: 200 };
+  assert.equal(
+    annotations.createMark("highlight", from, to, region, "nope").color,
+    MARK_COLORS.yellow,
+  );
+  assert.equal(annotations.createMark("box", from, to, region, "nope").color, MARK_COLORS.red);
+
+  const log = [];
+  annotations.drawMarks(
+    recordingContext(log),
+    { width: 800, height: 600 },
+    [{ tool: "highlight", left: 120, top: 60, width: 100, height: 20 }],
+    { origin: { left: 100, top: 50 }, scale: { x: 1, y: 1 }, createCanvas: () => null },
+  );
+  const fill = log.find(([, method]) => method === "set:fillStyle");
+  assert.equal(fill[2], MARK_COLORS.yellow, "a highlight without a colour is drawn yellow");
+});

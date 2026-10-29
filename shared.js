@@ -31,6 +31,11 @@
   });
 
   const SETTINGS_KEY = "settings";
+  // The colour last picked in the overlay's toolbar, kept apart from the settings page's
+  // settings, which that page writes whole.
+  const MARK_COLOR_KEY = "markColor";
+  // The highlighter keeps its own colour, yellow until another is picked for it.
+  const HIGHLIGHT_COLOR_KEY = "highlightColor";
 
   const IMAGE_FORMATS = Object.freeze({
     png: Object.freeze({ extension: "png", mime: "image/png" }),
@@ -122,7 +127,9 @@
     DEFAULT_SETTINGS,
     DEFAULT_SHORTCUTS,
     FILE_NAME_PREFIX_MAX_LENGTH,
+    HIGHLIGHT_COLOR_KEY,
     IMAGE_FORMATS,
+    MARK_COLOR_KEY,
     MESSAGE,
     SETTINGS_KEY,
     STATE,

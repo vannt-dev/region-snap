@@ -26,6 +26,12 @@ bản nào không có ở đó thì không phải do vannt-dev phát hành.
   `Esc` để hủy. Bấm vào ghi chú để sửa, kéo để di chuyển, và chọn cỡ nhỏ, vừa hoặc lớn bằng nút
   `A`. **Bước** `①` đặt các vòng tròn đánh số 1, 2, 3… sau mỗi lần bấm; hoàn tác bỏ bước cuối và
   lần bấm tiếp theo dùng lại số đó.
+- **Tô sáng** `▬` phủ màu lên một vùng như bút dạ quang, mặc định màu vàng: chữ bên dưới vẫn đọc
+  được, trên trang lẫn trong ảnh. Khi đang cầm một công cụ vẽ có màu, thanh công cụ có năm màu
+  (đỏ, vàng, xanh lá, xanh dương, đen) và đánh dấu màu mà công cụ đó sẽ dùng. Bút tô sáng có màu
+  riêng; mũi tên, khung, ghi chú và bước dùng chung một màu khác, mặc định màu đỏ, áp dụng cả cho
+  ghi chú đang gõ. Cả hai màu được nhớ cho vùng chọn sau và các trang khác; số và viền chữ chuyển
+  sang mực tối trên màu sáng.
 - Nút **Sao chép** đưa PNG vào clipboard thay vì tải về; trang không dùng được clipboard (ví dụ
   `http://` thường) sẽ tự chuyển sang tải file.
 - **Chụp toàn trang** (popup, hoặc `Alt+Shift+F`) cuộn tài liệu từng khung nhìn một và ghép các
