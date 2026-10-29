@@ -1,6 +1,6 @@
 # Privacy Policy for Region Snap
 
-Last updated: September 15, 2026
+Last updated: October 29, 2026
 
 ## Overview
 
