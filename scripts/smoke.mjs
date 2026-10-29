@@ -400,6 +400,7 @@ try {
 
   // Colours and the highlighter: the colours show while a tool that uses one is held, the pick
   // is stored for the next page, and a highlight tints the image without hiding what is under it.
+  // The highlighter starts yellow and keeps its own colour; the other tools start red.
   await evaluateIsolated(`
     globalThis.__stored = {};
     globalThis.chrome.storage = {
@@ -417,12 +418,10 @@ try {
   await tool("highlight").click();
   assert.equal(await root.getAttribute("data-tool"), "highlight");
   assert.equal(await colors.isVisible(), true, "the colours show with the highlighter");
-  assert.equal(await swatch("red").getAttribute("aria-pressed"), "true", "red is the default");
-  await swatch("yellow").click();
-  assert.equal(await swatch("yellow").getAttribute("aria-pressed"), "true");
+  assert.equal(await swatch("yellow").getAttribute("aria-pressed"), "true", "a yellow highlighter");
   assert.equal(await swatch("red").getAttribute("aria-pressed"), "false");
-  const storedColor = await evaluateIsolated("globalThis.__stored.markColor");
-  assert.equal(storedColor.result.value, "#facc15", "the colour is remembered");
+  const stored = async () =>
+    JSON.parse((await evaluateIsolated("JSON.stringify(globalThis.__stored)")).result.value);
   const stripeY = Math.round(at(0, 0.3).y);
   await drag(at(0.1, 0.2), at(0.5, 0.4));
   const highlightRect = targetPage.locator(".region-snap-mark-svg rect.region-snap-highlight");
@@ -434,9 +433,18 @@ try {
     "the highlight is see-through on the page",
   );
   await tool("box").click();
+  assert.equal(await swatch("red").getAttribute("aria-pressed"), "true", "a box starts red");
   await swatch("blue").click();
+  assert.equal(await swatch("blue").getAttribute("aria-pressed"), "true");
+  assert.deepEqual(await stored(), { markColor: "#3b82f6" }, "the colour is remembered");
   await drag(at(0.6, 0.6), at(0.9, 0.9));
   assert.equal(await targetPage.locator(".region-snap-mark-svg rect").count(), 2);
+  await tool("highlight").click();
+  assert.equal(
+    await swatch("yellow").getAttribute("aria-pressed"),
+    "true",
+    "picking blue for a box leaves the highlighter yellow",
+  );
 
   // A white screenshot with one black row of "text" running through the highlight.
   await evaluateIsolated(`(() => {
@@ -493,6 +501,12 @@ try {
   );
   assert.deepEqual(colourPixels.outsideHighlight, [255, 255, 255, 255]);
   assert.deepEqual(colourPixels.blueBox, [59, 130, 246, 255], "the box is drawn in blue");
+
+  // A colour picked with the highlighter held is the highlighter's alone.
+  await swatch("green").click();
+  assert.deepEqual(await stored(), { markColor: "#3b82f6", highlightColor: "#22c55e" });
+  await tool("arrow").click();
+  assert.equal(await swatch("blue").getAttribute("aria-pressed"), "true", "the arrow stays blue");
 
   await targetPage.keyboard.press("Escape");
   await targetPage.locator(".region-snap-undo").click();

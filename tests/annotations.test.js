@@ -413,3 +413,30 @@ test("text and steps are drawn in their colour with contrasting ink", () => {
     "the number on a yellow step uses dark ink",
   );
 });
+
+test("a highlight is yellow unless another colour is chosen for it", () => {
+  const { MARK_COLORS } = annotations;
+  assert.equal(annotations.HIGHLIGHT_COLOR, MARK_COLORS.yellow, "like a highlighter pen");
+  assert.equal(annotations.markColor("#123456", annotations.HIGHLIGHT_COLOR), MARK_COLORS.yellow);
+  assert.equal(
+    annotations.markColor(MARK_COLORS.blue, annotations.HIGHLIGHT_COLOR),
+    MARK_COLORS.blue,
+  );
+  const from = { x: 150, y: 80 };
+  const to = { x: 300, y: 200 };
+  assert.equal(
+    annotations.createMark("highlight", from, to, region, "nope").color,
+    MARK_COLORS.yellow,
+  );
+  assert.equal(annotations.createMark("box", from, to, region, "nope").color, MARK_COLORS.red);
+
+  const log = [];
+  annotations.drawMarks(
+    recordingContext(log),
+    { width: 800, height: 600 },
+    [{ tool: "highlight", left: 120, top: 60, width: 100, height: 20 }],
+    { origin: { left: 100, top: 50 }, scale: { x: 1, y: 1 }, createCanvas: () => null },
+  );
+  const fill = log.find(([, method]) => method === "set:fillStyle");
+  assert.equal(fill[2], MARK_COLORS.yellow, "a highlight without a colour is drawn yellow");
+});

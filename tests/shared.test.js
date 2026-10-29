@@ -115,3 +115,9 @@ test("the last mark colour is stored apart from the settings page's settings", (
   assert.notEqual(shared.MARK_COLOR_KEY, shared.SETTINGS_KEY);
   assert.equal(Object.hasOwn(shared.normalizeSettings(null), shared.MARK_COLOR_KEY), false);
 });
+
+test("the highlighter's colour is stored apart from the other marks' colour", () => {
+  assert.equal(typeof shared.HIGHLIGHT_COLOR_KEY, "string");
+  assert.notEqual(shared.HIGHLIGHT_COLOR_KEY, shared.MARK_COLOR_KEY);
+  assert.notEqual(shared.HIGHLIGHT_COLOR_KEY, shared.SETTINGS_KEY);
+});

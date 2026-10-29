@@ -12,6 +12,8 @@
     black: "#111827",
   });
   const MARK_COLOR = MARK_COLORS.red;
+  // A highlight starts yellow, like a highlighter pen, and keeps a colour of its own.
+  const HIGHLIGHT_COLOR = MARK_COLORS.yellow;
   const HALO_COLOR = "#ffffff";
   // Outline and numbers on a light colour, where white would not read.
   const DARK_INK = "#111827";
@@ -37,8 +39,13 @@
   const clamp = (value, min, max) => Math.min(Math.max(value, min), Math.max(min, max));
 
   // A stored or passed colour is untrusted; only the palette's colours are drawn.
-  function markColor(value) {
-    return Object.values(MARK_COLORS).includes(value) ? value : MARK_COLOR;
+  function markColor(value, fallback = MARK_COLOR) {
+    return Object.values(MARK_COLORS).includes(value) ? value : fallback;
+  }
+
+  // The colour a mark is drawn in: its own, or its tool's default.
+  function colorOf(mark) {
+    return markColor(mark.color, mark.tool === "highlight" ? HIGHLIGHT_COLOR : MARK_COLOR);
   }
 
   // White on dark colours, dark on light ones, by relative luminance.
@@ -53,7 +60,7 @@
   // Adds the colour to a new mark only when one was chosen, so marks made without one stay as
   // they were and are drawn in the default colour.
   const withColor = (mark, color) =>
-    color === undefined ? mark : { ...mark, color: markColor(color) };
+    color === undefined ? mark : { ...mark, color: colorOf({ ...mark, color }) };
 
   function textFont(size, scale = 1) {
     const pixels = (TEXT_SIZES[size] || TEXT_SIZES.medium) * scale;
@@ -326,7 +333,7 @@
       if (mark.tool !== "highlight") continue;
       context.save();
       context.globalAlpha = HIGHLIGHT_ALPHA;
-      context.fillStyle = markColor(mark.color);
+      context.fillStyle = colorOf(mark);
       context.fillRect(mark.left, mark.top, mark.width, mark.height);
       context.restore();
     }
@@ -357,6 +364,7 @@
     HALO_COLOR,
     HIDE_BLOCK,
     HIGHLIGHT_ALPHA,
+    HIGHLIGHT_COLOR,
     LINE_WIDTH,
     MARK_COLOR,
     MARK_COLORS,
@@ -369,6 +377,7 @@
     TEXT_WEIGHT,
     TOOLS,
     arrowHead,
+    colorOf,
     createMark,
     createStepMark,
     createTextMark,

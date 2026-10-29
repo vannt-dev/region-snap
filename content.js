@@ -17,6 +17,7 @@
 
   const {
     IMAGE_FORMATS,
+    HIGHLIGHT_COLOR_KEY,
     MARK_COLOR_KEY,
     MESSAGE,
     SETTINGS_KEY,
@@ -66,6 +67,8 @@
   // The colour of the marks that follow. It outlives the region and is stored for other pages;
   // `colorChoices` counts picks, so a stored colour read late does not undo a fresh one.
   let markColor = Annotations.MARK_COLOR;
+  // The highlighter's own colour, yellow like a highlighter pen until another is picked for it.
+  let highlightColor = Annotations.HIGHLIGHT_COLOR;
   let colorChoices = 0;
   // Set while a capture delay is counting down; calling it stops the countdown.
   let stopCountdown = null;
@@ -416,7 +419,7 @@
           height: mark.height,
         });
         area.style.setProperty("--rs-alpha", String(Annotations.HIGHLIGHT_ALPHA), "important");
-        highlights.appendChild(paint(area, mark.color));
+        highlights.appendChild(paint(area, Annotations.colorOf(mark)));
       } else if (mark.tool === "box") {
         markSvg.appendChild(
           paint(
@@ -495,20 +498,33 @@
     labelTextSize();
   }
 
-  // Shows which colour is chosen: the note's while one is typed, otherwise the next mark's.
+  // The colour the held tool draws with: the highlighter has its own, the other tools share one.
+  function toolColor() {
+    return activeTool === "highlight" ? highlightColor : markColor;
+  }
+
+  // Shows which colour is chosen: the note's while one is typed, otherwise the held tool's.
   function labelColors() {
     if (!colorGroup) return;
-    const current = editor?.color || markColor;
+    const current = editor?.color || toolColor();
     for (const button of colorGroup.querySelectorAll(".region-snap-color")) {
       const chosen = Annotations.MARK_COLORS[button.dataset.color] === current;
       button.setAttribute("aria-pressed", String(chosen));
     }
   }
 
-  // Sets the colour of the marks that follow, and of the note being typed, and remembers it.
+  // Sets the colour of the held tool's next marks, and of the note being typed, and remembers
+  // it. With the highlighter held only the highlighter's colour changes.
   function setMarkColor(color) {
-    markColor = Annotations.markColor(color);
     colorChoices += 1;
+    let stored;
+    if (activeTool === "highlight" && !editor) {
+      highlightColor = Annotations.markColor(color, Annotations.HIGHLIGHT_COLOR);
+      stored = { [HIGHLIGHT_COLOR_KEY]: highlightColor };
+    } else {
+      markColor = Annotations.markColor(color);
+      stored = { [MARK_COLOR_KEY]: markColor };
+    }
     if (editor) {
       editor.color = markColor;
       styleEditor();
@@ -516,7 +532,7 @@
     }
     labelColors();
     try {
-      Promise.resolve(chrome.storage.local.set({ [MARK_COLOR_KEY]: markColor })).catch(() => {});
+      Promise.resolve(chrome.storage.local.set(stored)).catch(() => {});
     } catch {
       // Without the storage API the colour lasts while the page is open.
     }
@@ -525,9 +541,15 @@
   async function loadMarkColor() {
     const choices = colorChoices;
     try {
-      const stored = (await chrome.storage.local.get(MARK_COLOR_KEY))?.[MARK_COLOR_KEY];
+      const stored = await chrome.storage.local.get([MARK_COLOR_KEY, HIGHLIGHT_COLOR_KEY]);
       if (!stored || choices !== colorChoices) return;
-      markColor = Annotations.markColor(stored);
+      if (stored[MARK_COLOR_KEY]) markColor = Annotations.markColor(stored[MARK_COLOR_KEY]);
+      if (stored[HIGHLIGHT_COLOR_KEY]) {
+        highlightColor = Annotations.markColor(
+          stored[HIGHLIGHT_COLOR_KEY],
+          Annotations.HIGHLIGHT_COLOR,
+        );
+      }
       labelColors();
     } catch {
       // Keeps the colour already in use.
@@ -626,6 +648,7 @@
     for (const button of toolbar.querySelectorAll(".region-snap-tool")) {
       button.setAttribute("aria-pressed", String(button.dataset.tool === activeTool));
     }
+    labelColors();
     if (TOOL_HINTS[activeTool]) {
       if (!shownToolHints.has(activeTool)) showToast(t(TOOL_HINTS[activeTool]));
       shownToolHints.add(activeTool);
@@ -701,7 +724,7 @@
       markStart,
       { x: event.clientX, y: event.clientY },
       rect,
-      markColor,
+      toolColor(),
     );
     renderMarks();
   }
@@ -720,7 +743,7 @@
             markStart,
             { x: event.clientX, y: event.clientY },
             rect,
-            markColor,
+            toolColor(),
           )
         : null;
     if (mark) marks = [...marks, mark];
