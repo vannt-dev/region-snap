@@ -8,3 +8,4 @@ require("./desktop-capture.test.js");
 require("./desktop-i18n.test.js");
 require("./performance.test.js");
 require("./background.test.js");
+require("./store-zip.test.js");
