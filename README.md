@@ -12,6 +12,28 @@ content, while the desktop app captures regions across multiple displays with mi
 Official builds are listed at [vannt-dev.github.io/official.html](https://vannt-dev.github.io/official.html);
 anything else is not published by vannt-dev.
 
+```mermaid
+flowchart TB
+  subgraph ext ["Chrome extension"]
+    direction LR
+    start["Icon, popup or<br/>Alt+Shift+S"] --> select["Click an<br/>element or<br/>drag a region"]
+    select --> mark["Mark it<br/>arrow, box,<br/>text, hide"]
+    mark --> shot["Capture region,<br/>scrolling area,<br/>burst or watch"]
+    full["Full page<br/>popup or<br/>Alt+Shift+F"] --> file
+    shot --> file["PNG, JPEG or<br/>WebP, download<br/>or clipboard"]
+  end
+  geo["geometry.js<br/>shared region<br/>and crop math"]
+  subgraph desk ["Windows desktop app (Electron)"]
+    direction LR
+    tray["Tray icon or<br/>global shortcut"] --> drag["Drag a region<br/>across monitors"]
+    drag --> fresh["Hide overlay,<br/>crop a fresh<br/>frame"]
+    fresh --> png["PNG in a<br/>local folder,<br/>clipboard copy"]
+  end
+  ext ~~~ geo ~~~ desk
+  geo -.-> ext
+  geo -.-> desk
+```
+
 ## Features
 
 - Quick-select a single element with a click.
