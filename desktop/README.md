@@ -11,6 +11,13 @@ npm run desktop:start
 
 Region Snap stays in the system tray. Press `Alt+Shift+S` or double-click the tray icon, drag a region, then press **Capture** or `Enter`. The transparent overlay keeps video and other dynamic content visible while selecting. At capture time the overlay is hidden and a fresh desktop frame is cropped, copied to the clipboard, and saved under `Pictures/Region Snap`.
 
+To copy the text in a region instead of the image, select the region and press **Copy text** or
+`T`. Region Snap recognises English and Vietnamese, puts the text on the clipboard, and shows how many
+lines it copied; when the region has no readable text, the overlay stays open so you can adjust the
+selection. Recognition runs on your device with Tesseract (WebAssembly) and the English and
+Vietnamese models bundled in the app. Nothing is downloaded or uploaded; on first use the two models
+(about 4.4 MB) are copied to `ocr-languages` in the app data folder.
+
 Open **Cài đặt…** from the tray menu to change the shortcut, output directory, clipboard behavior, or Windows login startup.
 
 ## Package for Windows
@@ -30,6 +37,7 @@ The NSIS installer is written to `release/`.
 - Fresh-frame capture for video and other dynamic content
 - Crops each display before transferring image data to keep multi-monitor memory use bounded
 - Configurable PNG output directory and clipboard copy
+- Offline Copy text (OCR) for English and Vietnamese, from the toolbar or `T`
 - Optional startup with Windows in packaged builds
 - Vietnamese and English desktop UI based on the Windows locale
 - Success notification containing the saved file path

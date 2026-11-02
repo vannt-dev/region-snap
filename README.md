@@ -98,6 +98,9 @@ flowchart TB
 - Selects across multiple monitors and preserves mixed-DPI output quality.
 - Captures a fresh frame after hiding the overlay, suitable for video and other dynamic content.
 - Saves PNG files locally and can copy them directly to the clipboard.
+- **Copy text** (toolbar button or `T` while selecting) reads the text in the region and puts it on
+  the clipboard. English and Vietnamese are recognised fully offline: the Tesseract engine and both
+  language models ship inside the app, and nothing is sent over the network.
 - Supports English and Vietnamese UI, keyboard movement/resizing, and optional startup with Windows.
 
 Run `npm run desktop:start` during development or `npm run desktop:dist` to create the NSIS

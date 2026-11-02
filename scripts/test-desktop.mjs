@@ -106,6 +106,11 @@ try {
   await overlay.mouse.move(selection.left + selection.width, selection.top + selection.height);
   await overlay.mouse.up();
   const selector = overlay.locator("#selector");
+  assert.equal(
+    await overlay.locator("#copy-text").isVisible(),
+    true,
+    "the toolbar must offer Copy text",
+  );
   const beforeMove = await selector.evaluate((element) => element.style.getPropertyValue("--x"));
   await overlay.locator("#move").press("ArrowRight");
   const afterMove = await selector.evaluate((element) => element.style.getPropertyValue("--x"));
