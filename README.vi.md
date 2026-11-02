@@ -69,6 +69,7 @@ bản nào không có ở đó thì không phải do vannt-dev phát hành.
 - Chọn vùng xuyên nhiều màn hình và giữ đúng chất lượng khi mixed-DPI.
 - Ẩn overlay rồi lấy frame mới, phù hợp với video và nội dung động.
 - Lưu PNG cục bộ và có thể copy trực tiếp vào clipboard.
+- **Sao chép chữ** (nút trên thanh công cụ hoặc phím `T` khi đang chọn vùng) nhận dạng chữ trong vùng và đưa vào clipboard. Nhận dạng tiếng Anh và tiếng Việt hoàn toàn offline: engine Tesseract và hai bộ dữ liệu ngôn ngữ nằm sẵn trong ứng dụng, không gửi gì qua mạng.
 - Hỗ trợ giao diện tiếng Việt/Anh, di chuyển–resize bằng bàn phím và tùy chọn khởi động cùng Windows.
 
 Dùng `npm run desktop:start` khi phát triển hoặc `npm run desktop:dist` để tạo bộ cài NSIS. Xem [`desktop/README.md`](desktop/README.md) để biết cách sử dụng, đóng gói và ký số.

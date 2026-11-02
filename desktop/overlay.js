@@ -7,10 +7,11 @@
   const sizeLabel = document.getElementById("size");
   const moveButton = document.getElementById("move");
   const captureButton = document.getElementById("capture");
+  const copyTextButton = document.getElementById("copy-text");
   const cancelButton = document.getElementById("cancel");
   const status = document.getElementById("status");
   const MIN_SIZE = 8;
-  const TOOLBAR_WIDTH = 230;
+  const TOOLBAR_WIDTH = 370;
   const TOOLBAR_HEIGHT = 42;
 
   let rect = null;
@@ -166,21 +167,48 @@
     render();
   }
 
+  const canCapture = () =>
+    rect &&
+    rect.width >= MIN_SIZE &&
+    rect.height >= MIN_SIZE &&
+    ready &&
+    selector.dataset.state !== "saving";
+
+  async function captureSelection() {
+    const capture = await api.captureSources({
+      rect,
+      viewport: bounds(),
+    });
+    return stitchCapture(capture);
+  }
+
   async function saveSelection() {
-    if (!rect || rect.width < MIN_SIZE || rect.height < MIN_SIZE || !ready) return;
+    if (!canCapture()) return;
     selector.dataset.state = "saving";
     showStatus(translate("capturing"));
     try {
-      const capture = await api.captureSources({
-        rect,
-        viewport: bounds(),
-      });
-      const dataUrl = await stitchCapture(capture);
-      await api.save(dataUrl);
+      await api.save(await captureSelection());
     } catch (error) {
       api.restore();
       selector.dataset.state = "ready";
       showStatus(error?.message || translate("captureFailed"));
+    }
+  }
+
+  async function copySelectionText() {
+    if (!canCapture()) return;
+    selector.dataset.state = "saving";
+    showStatus(translate("readingText"));
+    try {
+      const { lineCount } = await api.copyText(await captureSelection());
+      if (!lineCount) {
+        selector.dataset.state = "ready";
+        showStatus(translate("noTextFound"));
+      }
+    } catch (error) {
+      api.restore();
+      selector.dataset.state = "ready";
+      showStatus(error?.message || translate("copyTextFailed"));
     }
   }
 
@@ -198,10 +226,14 @@
     handle.addEventListener("keydown", (event) => resizeWithKeyboard(event, handle.dataset.handle));
   }
   captureButton.addEventListener("click", saveSelection);
+  copyTextButton.addEventListener("click", copySelectionText);
   cancelButton.addEventListener("click", api.cancel);
   window.addEventListener("keydown", (event) => {
     if (event.key === "Escape") api.cancel();
     if (event.key === "Enter") saveSelection();
+    if (event.key.toLowerCase() === "t" && !event.ctrlKey && !event.altKey && !event.metaKey) {
+      copySelectionText();
+    }
   });
   window.addEventListener("resize", () => {
     if (rect) rect = Geometry.fitRectToBounds(rect, bounds());

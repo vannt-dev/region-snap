@@ -23,6 +23,7 @@ const {
   sameDisplayLayout,
   validateSelection,
 } = require("./capture-utils.cjs");
+const { copyTextFromImage, createTesseractRecognizer, ocrScale } = require("./ocr.cjs");
 
 const DEFAULT_SETTINGS = Object.freeze({
   shortcut: "Alt+Shift+S",
@@ -42,6 +43,8 @@ const MAIN_COPY = Object.freeze({
     captureFailed: "Could not capture the screen.",
     captureSaved: "Screenshot saved to {path}",
     chooseFolder: "Choose screenshot folder",
+    textCopiedOne: "Copied 1 line of text",
+    textCopied: "Copied {count} lines of text",
   },
   vi: {
     capture: "Chụp vùng",
@@ -51,6 +54,8 @@ const MAIN_COPY = Object.freeze({
     captureFailed: "Không thể chụp màn hình.",
     captureSaved: "Đã lưu ảnh vào {path}",
     chooseFolder: "Chọn thư mục lưu ảnh",
+    textCopiedOne: "Đã sao chép 1 dòng chữ",
+    textCopied: "Đã sao chép {count} dòng chữ",
   },
 });
 const overlayWindows = new Map();
@@ -59,6 +64,7 @@ let settingsWindow = null;
 let settings = { ...DEFAULT_SETTINGS };
 let captureInProgress = false;
 let quitting = false;
+let recognizeText = null;
 
 if (E2E_MODE && process.env.REGION_SNAP_E2E_USER_DATA) {
   app.setPath("userData", process.env.REGION_SNAP_E2E_USER_DATA);
@@ -311,21 +317,30 @@ async function uniqueOutputPath(directory) {
   throw new Error("Không thể tạo tên file ảnh duy nhất.");
 }
 
-async function saveCapture(event, dataUrl) {
+function assertCaptureRequest(event) {
   const owner = BrowserWindow.fromWebContents(event.sender);
   if (!owner || !overlayWindows.has(owner) || !captureInProgress) {
     throw new Error("Yêu cầu lưu ảnh không hợp lệ.");
   }
+}
+
+function decodeCapture(dataUrl) {
+  if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/png;base64,")) {
+    throw new Error("Dữ liệu ảnh không hợp lệ.");
+  }
+  const bytes = Buffer.from(dataUrl.slice("data:image/png;base64,".length), "base64");
+  if (!bytes.length || bytes.length > MAX_CAPTURE_BYTES) {
+    throw new Error("Kích thước ảnh không hợp lệ.");
+  }
+  const image = nativeImage.createFromBuffer(bytes);
+  if (image.isEmpty()) throw new Error("Không thể đọc ảnh đã chụp.");
+  return image;
+}
+
+async function saveCapture(event, dataUrl) {
+  assertCaptureRequest(event);
   try {
-    if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/png;base64,")) {
-      throw new Error("Dữ liệu ảnh không hợp lệ.");
-    }
-    const bytes = Buffer.from(dataUrl.slice("data:image/png;base64,".length), "base64");
-    if (!bytes.length || bytes.length > MAX_CAPTURE_BYTES) {
-      throw new Error("Kích thước ảnh không hợp lệ.");
-    }
-    const image = nativeImage.createFromBuffer(bytes);
-    if (image.isEmpty()) throw new Error("Không thể đọc ảnh đã chụp.");
+    const image = decodeCapture(dataUrl);
     const directory = outputDirectory();
     await fs.mkdir(directory, { recursive: true });
     const outputPath = await uniqueOutputPath(directory);
@@ -340,6 +355,48 @@ async function saveCapture(event, dataUrl) {
       );
     }
     return { outputPath, copiedToClipboard: settings.copyToClipboard, protectedWarning };
+  } catch (error) {
+    setOverlaysVisible(true);
+    throw error;
+  } finally {
+    captureInProgress = false;
+  }
+}
+
+function textRecognizer() {
+  recognizeText ??= createTesseractRecognizer({
+    languageDirectory: path.join(app.getPath("userData"), "ocr-languages"),
+  });
+  return recognizeText;
+}
+
+async function copyCaptureText(event, dataUrl) {
+  assertCaptureRequest(event);
+  try {
+    const image = decodeCapture(dataUrl);
+    const size = image.getSize();
+    const scale = ocrScale(size);
+    const scaled =
+      scale > 1
+        ? image.resize({
+            width: Math.round(size.width * scale),
+            height: Math.round(size.height * scale),
+            quality: "best",
+          })
+        : image;
+    const { lineCount } = await copyTextFromImage(scaled.toPNG(), {
+      recognize: textRecognizer(),
+      writeText: (text) => clipboard.writeText(text),
+    });
+    if (lineCount) {
+      closeOverlays();
+      showNotice(
+        lineCount === 1 ? mainCopy("textCopiedOne") : mainCopy("textCopied", { count: lineCount }),
+      );
+    } else {
+      setOverlaysVisible(true);
+    }
+    return { lineCount };
   } catch (error) {
     setOverlaysVisible(true);
     throw error;
@@ -452,18 +509,20 @@ function showError(error) {
   }
 }
 
-function showCaptureSuccess(outputPath) {
+function showNotice(content) {
   if (!tray) return;
-  tray.displayBalloon({
-    title: "Region Snap",
-    content: mainCopy("captureSaved", { path: outputPath }),
-  });
+  tray.displayBalloon({ title: "Region Snap", content });
+}
+
+function showCaptureSuccess(outputPath) {
+  showNotice(mainCopy("captureSaved", { path: outputPath }));
 }
 
 ipcMain.on("cancel-capture", closeOverlays);
 ipcMain.on("restore-capture", restoreCapture);
 ipcMain.handle("capture-sources", captureSources);
 ipcMain.handle("save-capture", saveCapture);
+ipcMain.handle("copy-text", copyCaptureText);
 ipcMain.handle("get-settings", () => ({ ...settings, packaged: app.isPackaged }));
 ipcMain.handle("choose-output-directory", async () => {
   const result = await dialog.showOpenDialog(settingsWindow || undefined, {
