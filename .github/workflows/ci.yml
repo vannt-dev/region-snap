@@ -4,10 +4,6 @@ on:
   push:
     branches: [main, develop]
   pull_request:
-    paths-ignore:
-      - "*.md"
-      - "docs/**"
-      - LICENSE
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -96,3 +92,21 @@ jobs:
         with:
           name: region-snap-windows-installer
           path: release/Region-Snap-Setup-*.exe
+
+  # The one check branch protection requires: it passes when every job above passed or was
+  # skipped, and fails on a failure or a cancellation.
+  ci-result:
+    name: CI result
+    if: always()
+    needs: [quality, smoke, desktop]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every job passed or was skipped
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "job results: $RESULTS"
+          case " $RESULTS " in
+            *" failure "*|*" cancelled "*) exit 1 ;;
+          esac
