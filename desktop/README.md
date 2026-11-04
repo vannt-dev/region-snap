@@ -48,9 +48,9 @@ Protected/DRM surfaces and the Windows secure desktop may not be capturable. mac
 
 ## Signed releases
 
-Tagged GitHub releases require an Authenticode certificate. Configure these repository secrets:
+Tagged GitHub releases sign the installer when an Authenticode certificate is configured in these repository secrets:
 
 - `WINDOWS_CSC_LINK`: a base64-encoded `.pfx` certificate or a certificate URL supported by electron-builder
 - `WINDOWS_CSC_KEY_PASSWORD`: the certificate password
 
-The release workflow builds the Chrome Web Store ZIP and Windows NSIS installer separately. When signing secrets are available, it verifies both the packaged executable and installer signatures before publishing them. Without a certificate, the Chrome package is released first and the unsigned Windows installer is omitted; rerunning the workflow after configuring the secrets attaches the signed installer to the same release. Manual workflow runs may still produce unsigned test artifacts.
+The release workflow builds the Chrome Web Store ZIP and Windows NSIS installer separately. When signing secrets are available, it verifies both the packaged executable and installer signatures before publishing them. Without a certificate the installer is attached unsigned, and Windows SmartScreen warns before it runs (More info, then Run anyway).

@@ -72,6 +72,8 @@ bản nào không có ở đó thì không phải do vannt-dev phát hành.
 - **Sao chép chữ** (nút trên thanh công cụ hoặc phím `T` khi đang chọn vùng) nhận dạng chữ trong vùng và đưa vào clipboard. Nhận dạng tiếng Anh và tiếng Việt hoàn toàn offline: engine Tesseract và hai bộ dữ liệu ngôn ngữ nằm sẵn trong ứng dụng, không gửi gì qua mạng.
 - Hỗ trợ giao diện tiếng Việt/Anh, di chuyển–resize bằng bàn phím và tùy chọn khởi động cùng Windows.
 
+Tải `Region-Snap-Setup-<version>.exe` từ [bản phát hành mới nhất](https://github.com/vannt-dev/region-snap/releases/latest). Bộ cài chưa được ký số nên Windows SmartScreen sẽ hỏi trước: chọn **Thông tin thêm**, rồi **Vẫn chạy**.
+
 Dùng `npm run desktop:start` khi phát triển hoặc `npm run desktop:dist` để tạo bộ cài NSIS. Xem [`desktop/README.md`](desktop/README.md) để biết cách sử dụng, đóng gói và ký số.
 
 ## Cài đặt
@@ -157,7 +159,7 @@ npm run desktop:dist
 
 File có thể upload trực tiếp lên Chrome Web Store được tạo tại `release/region-snap-interactive-screenshot-v<version>-store.zip`. Pipeline kiểm tra nội dung ZIP theo allowlist để test, source map, tài liệu nội bộ và dependency phát triển không lọt vào gói phát hành.
 
-Bộ cài Windows được tạo tại `release/Region-Snap-Setup-<version>.exe`. Release có tag chỉ phát hành bộ cài khi đã cấu hình các secret Authenticode được hướng dẫn trong [`desktop/README.md`](desktop/README.md); nếu chưa có, gói Chrome sẽ được phát hành trước và installer unsigned bị loại bỏ.
+Bộ cài Windows được tạo tại `release/Region-Snap-Setup-<version>.exe` và được đính kèm vào mọi release có tag. Bộ cài được ký khi đã cấu hình các secret Authenticode hướng dẫn trong [`desktop/README.md`](desktop/README.md); khi chưa có, bộ cài chưa được ký và Windows SmartScreen sẽ cảnh báo trước khi chạy (chọn Thông tin thêm, rồi Vẫn chạy).
 
 ## Chrome Web Store
 
