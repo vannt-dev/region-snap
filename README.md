@@ -103,6 +103,10 @@ flowchart TB
   language models ship inside the app, and nothing is sent over the network.
 - Supports English and Vietnamese UI, keyboard movement/resizing, and optional startup with Windows.
 
+Download `Region-Snap-Setup-<version>.exe` from the
+[latest release](https://github.com/vannt-dev/region-snap/releases/latest). The installer is not
+code-signed yet, so Windows SmartScreen asks first: choose **More info**, then **Run anyway**.
+
 Run `npm run desktop:start` during development or `npm run desktop:dist` to create the NSIS
 installer. See [`desktop/README.md`](desktop/README.md) for desktop usage, packaging, and code-signing
 details.
@@ -215,9 +219,10 @@ A file ready to upload to the Chrome Web Store is produced at
 contents against an allowlist so tests, source maps, internal docs, and dev dependencies never leak
 into the release package.
 
-The Windows installer is produced at `release/Region-Snap-Setup-<version>.exe`. Tagged releases
-publish it only when the Authenticode secrets documented in [`desktop/README.md`](desktop/README.md)
-are configured; otherwise the Chrome package is released first and the unsigned installer is omitted.
+The Windows installer is produced at `release/Region-Snap-Setup-<version>.exe` and attached to every
+tagged release. It is signed when the Authenticode secrets documented in
+[`desktop/README.md`](desktop/README.md) are configured; until then it is unsigned and Windows
+SmartScreen warns before it runs (More info, then Run anyway).
 
 ## Chrome Web Store
 
