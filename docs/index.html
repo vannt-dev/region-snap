@@ -29,53 +29,83 @@
     <link rel="icon" href="icons/icon48.png" />
     <link rel="stylesheet" href="site.css" />
   </head>
-  <body>
-    <main>
-      <div class="brand">
-        <img src="icons/icon128.png" alt="" />
-        <h1>Region Snap</h1>
-      </div>
-      <p class="lead">
-        Capture precise regions from Chrome or across a multi-monitor Windows desktop. Everything
-        stays on your device and exports as a local PNG.
-      </p>
-      <div class="actions">
-        <a
-          class="button"
-          href="https://chromewebstore.google.com/detail/region-snap-interactive-s/gdcpiocagphfbomdokhfomjnecnjfcon"
-          >Add to Chrome</a
-        >
-        <a class="button secondary" href="https://github.com/vannt-dev/region-snap/releases/latest"
-          >Download for Windows</a
-        >
-        <a class="button secondary" href="privacy-policy.html">Privacy policy</a>
-        <a class="button secondary" href="https://github.com/vannt-dev/region-snap">View source</a>
-      </div>
-      <p class="meta">
-        The Chrome extension is on the Chrome Web Store; the Windows installer and extension package
-        ship in every release.
-      </p>
-
-      <div class="mock" aria-hidden="true">
-        <div class="mock__bar">
-          <span class="mock__dot"></span>
-          <span class="mock__dot"></span>
-          <span class="mock__dot"></span>
+  <body class="home">
+    <nav class="topbar" aria-label="Main">
+      <div class="wrap">
+        <a class="brand" href="#top">
+          <span class="logo" aria-hidden="true">
+            <svg width="18" height="18" viewBox="30 30 68 68">
+              <path
+                d="M37 53V41a4 4 0 0 1 4-4h12M75 37h12a4 4 0 0 1 4 4v12M91 75v12a4 4 0 0 1-4 4H75M53 91H41a4 4 0 0 1-4-4V75"
+                fill="none"
+                stroke="#fff"
+                stroke-width="9"
+                stroke-linecap="round"
+              />
+            </svg>
+          </span>
+          Region Snap
+        </a>
+        <div class="navlinks">
+          <a class="sec" href="#features">Features</a>
+          <a href="privacy-policy.html">Privacy</a>
+          <a href="https://github.com/vannt-dev/region-snap">GitHub ↗</a>
         </div>
-        <div class="mock__body">
-          <div class="mock__block mock__block--wide"></div>
-          <div class="mock__block"></div>
-          <div class="mock__selection">
-            <span class="mock__handle mock__handle--nw"></span>
-            <span class="mock__handle mock__handle--ne"></span>
-            <span class="mock__handle mock__handle--sw"></span>
-            <span class="mock__handle mock__handle--se"></span>
+      </div>
+    </nav>
+    <main class="wrap" id="top">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">
+            <span class="pulse" aria-hidden="true"></span>Screenshots for Chrome and Windows
+          </p>
+          <h1>Capture <span class="grad">exactly the region</span> you need.</h1>
+          <p class="lead">
+            Capture precise regions from Chrome or across a multi-monitor Windows desktop.
+            Everything stays on your device and exports as a local PNG.
+          </p>
+          <div class="actions">
+            <a
+              class="button"
+              href="https://chromewebstore.google.com/detail/region-snap-interactive-s/gdcpiocagphfbomdokhfomjnecnjfcon"
+              >Add to Chrome</a
+            >
+            <a
+              class="button secondary"
+              href="https://github.com/vannt-dev/region-snap/releases/latest"
+              >Download for Windows</a
+            >
+            <a class="button secondary" href="privacy-policy.html">Privacy policy</a>
+            <a class="button secondary" href="https://github.com/vannt-dev/region-snap"
+              >View source</a
+            >
           </div>
-          <div class="mock__block mock__block--short"></div>
+          <p class="meta">
+            The Chrome extension is on the Chrome Web Store; the Windows installer and extension
+            package ship in every release.
+          </p>
+          <ul class="trust">
+            <li>Chrome and Windows</li>
+            <li>Nothing leaves your device</li>
+            <li>MIT</li>
+          </ul>
         </div>
-      </div>
+        <div class="hero-term">
+          <div class="term">
+            <div class="term-bar">
+              <span></span><span></span><span></span><code>screenshot-select-region.png</code>
+            </div>
+            <img
+              src="screenshot-select-region.png"
+              width="1280"
+              height="800"
+              alt="Region Snap in Chrome: a locked region with its toolbar, 664 × 294, and the Capture button"
+            />
+          </div>
+        </div>
+      </header>
 
-      <section class="features">
+      <section class="features" id="features">
         <h2>One tool, from browser to desktop</h2>
         <div class="feature-grid">
           <article class="feature">
