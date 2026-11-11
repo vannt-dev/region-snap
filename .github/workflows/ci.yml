@@ -62,7 +62,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        # On a GitHub runner --with-deps only adds font packages. When the runner cannot reach
+        # the Ubuntu mirrors, install the browser alone: the test below still decides.
+        run: npx playwright install --with-deps chromium || npx playwright install chromium
       - name: Build extension
         run: npm run build
       - name: Run smoke test
