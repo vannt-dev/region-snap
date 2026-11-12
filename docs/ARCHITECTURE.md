@@ -20,6 +20,9 @@ framework or bundler, which keeps the Store package small and makes its contents
   controller must remove every listener it creates when `destroy()` is called.
 - `popup.js` only renders current state and sends commands. It does not inject scripts or capture tabs
   directly.
+- `editor.js` runs the editor page, which opens an image file or a pasted or dropped image and
+  loads `content.js` beside it: `openImage` on the controller puts the overlay's marking tools
+  over the image and saves it whole at its own resolution, without capturing a tab.
 - `options.js` is the only writer of `chrome.storage.local`. `content.js` reads the settings at
   capture time and falls back to the defaults when storage is unavailable.
 - `overlay.css` and `popup.css` contain their respective visual systems. Shared visual values use the

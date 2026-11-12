@@ -595,3 +595,19 @@
     animation: none;
   }
 }
+
+/* An image opened on the editor page: the region is the whole image, square-cornered like the
+   saved file, and the page around it is not dimmed. Moving, resizing and the tools that need a
+   live page are left out. */
+#region-snap-root[data-source="image"] {
+  --rs-radius: 0px;
+}
+
+#region-snap-root[data-source="image"] .region-snap-dim,
+#region-snap-root[data-source="image"] .region-snap-handle,
+#region-snap-root[data-source="image"] .region-snap-grip,
+#region-snap-root[data-source="image"] .region-snap-scroll,
+#region-snap-root[data-source="image"] .region-snap-burst,
+#region-snap-root[data-source="image"] .region-snap-watch {
+  display: none !important;
+}

@@ -29,6 +29,9 @@ test("all extension entry files exist", () => {
     "overlay.css",
     "popup.js",
     "popup.css",
+    "editor.html",
+    "editor.js",
+    "editor.css",
     "_locales/en/messages.json",
     "_locales/vi/messages.json",
   ];

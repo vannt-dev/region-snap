@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title data-i18n="editorTitle">Mark up an image</title>
+    <link rel="stylesheet" href="editor.css" />
+    <link rel="stylesheet" href="overlay.css" />
+  </head>
+  <body data-view="start">
+    <header class="bar">
+      <img class="bar__icon" src="icons/icon32.png" alt="" />
+      <strong class="bar__name">Region Snap</strong>
+      <button id="open-image" class="button button--primary" type="button">
+        <span data-i18n="editorOpen">Open image</span>
+      </button>
+      <span class="bar__hint" data-i18n="editorPasteHint">or paste (Ctrl+V) or drop one here</span>
+      <p id="error-message" class="error-message" role="alert" hidden></p>
+      <input id="file-input" type="file" hidden />
+    </header>
+
+    <main id="start" class="start">
+      <h1 data-i18n="editorTitle">Mark up an image</h1>
+      <p data-i18n="editorIntro">
+        Open an image file, paste one from the clipboard with Ctrl+V, or drop one on this page. Mark
+        it with the same tools as a capture, then save or copy it.
+      </p>
+      <button id="open-image-start" class="button button--primary" type="button">
+        <span data-i18n="editorOpen">Open image</span>
+      </button>
+    </main>
+
+    <div id="stage" class="stage"></div>
+
+    <script src="shared.js"></script>
+    <script src="geometry.js"></script>
+    <script src="annotations.js"></script>
+    <script src="schedule.js"></script>
+    <script src="content.js"></script>
+    <script src="editor.js"></script>
+  </body>
+</html>

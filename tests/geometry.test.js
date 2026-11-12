@@ -233,3 +233,50 @@ test("a slice that adds nothing new is skipped", () => {
     null,
   );
 });
+
+test("shows an opened image at its own size in CSS pixels, centred below the top bar", () => {
+  assert.deepEqual(
+    geometry.fitImage(
+      { width: 800, height: 400 },
+      { width: 1200, height: 800 },
+      { pixelRatio: 2, top: 100, margin: 20 },
+    ),
+    { left: 400, top: 340, width: 400, height: 200 },
+  );
+});
+
+test("shrinks an opened image that is larger than the window and keeps its shape", () => {
+  assert.deepEqual(
+    geometry.fitImage(
+      { width: 4000, height: 1000 },
+      { width: 1040, height: 800 },
+      { pixelRatio: 1, top: 100, margin: 20 },
+    ),
+    { left: 20, top: 315, width: 1000, height: 250 },
+  );
+  assert.deepEqual(
+    geometry.fitImage(
+      { width: 1000, height: 3000 },
+      { width: 1200, height: 720 },
+      { pixelRatio: 1, top: 100, margin: 20 },
+    ),
+    { left: 500, top: 100, width: 200, height: 600 },
+  );
+});
+
+test("never shows an opened image smaller than one pixel", () => {
+  const box = geometry.fitImage(
+    { width: 1, height: 1 },
+    { width: 30, height: 30 },
+    { pixelRatio: 3, top: 40, margin: 20 },
+  );
+  assert.equal(box.width, 1);
+  assert.equal(box.height, 1);
+});
+
+test("tells whether an image fits in one canvas", () => {
+  assert.equal(geometry.fitsCanvas({ width: 4000, height: 3000 }), true);
+  assert.equal(geometry.fitsCanvas({ width: 40000, height: 10 }), false);
+  assert.equal(geometry.fitsCanvas({ width: 20000, height: 20000 }), false);
+  assert.equal(geometry.fitsCanvas({ width: 0, height: 10 }), false);
+});

@@ -78,6 +78,9 @@
   // A burst or a capture-on-change run: its kind, the shots taken and allowed, its settings and
   // the series timestamp. One runs at a time.
   let seriesRun = null;
+  // An image opened on the editor page instead of a live page: its element, the box it is
+  // shown in and what to call when it is closed. Its region is the whole image.
+  let imageSource = null;
 
   let root;
   let dim;
@@ -326,7 +329,10 @@
     root.style.setProperty("--rs-toolbar-left", `${toolbarPosition.left}px`);
     root.style.setProperty("--rs-toolbar-top", `${toolbarPosition.top}px`);
 
-    const nextSize = `${Math.round(value.width)} × ${Math.round(value.height)}`;
+    // An opened image is saved at its own size, so that is the size shown.
+    const nextSize = imageSource
+      ? `${imageSource.element.naturalWidth} × ${imageSource.element.naturalHeight}`
+      : `${Math.round(value.width)} × ${Math.round(value.height)}`;
     if (sizeLabel.textContent !== nextSize) sizeLabel.textContent = nextSize;
   }
 
@@ -1079,6 +1085,8 @@
   }
 
   function onViewportResize() {
+    // An opened image keeps the box it was shown in, so its marks stay on it.
+    if (imageSource) return;
     if (state === STATE.HOVERING && hoveredElement) {
       renderHoveredElement(hoveredElement);
       return;
@@ -1140,6 +1148,9 @@
     editor = null;
     lockedElement = null;
     removeOverlay();
+    const closedImage = imageSource;
+    imageSource = null;
+    closedImage?.onClose?.();
   }
 
   const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
@@ -1283,6 +1294,33 @@
     }
   }
 
+  // An opened image is saved whole and at its own resolution, with the marks drawn over it at
+  // that scale. It keeps its own corners: the rounded-corner setting is for screenshots.
+  async function imageToBlob(source, settings, selectedMarks) {
+    const { element, box } = source;
+    const canvas = createScratchCanvas(element.naturalWidth, element.naturalHeight);
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error(t("overlayCanvasError"));
+    const { mime } = IMAGE_FORMATS[settings.format];
+    // JPEG has no transparency: a transparent part of the image would come out black.
+    if (mime === "image/jpeg") {
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    context.drawImage(element, 0, 0);
+    Annotations.drawMarks(context, canvas, selectedMarks, {
+      origin: { left: box.left, top: box.top },
+      scale: { x: canvas.width / box.width, y: canvas.height / box.height },
+      createCanvas: createScratchCanvas,
+    });
+    try {
+      return await canvasToBlob(canvas, mime);
+    } finally {
+      canvas.width = 1;
+      canvas.height = 1;
+    }
+  }
+
   const DELIVERY_MESSAGES = {
     copied: "overlayCopied",
     fallback: "overlayCopyFallback",
@@ -1339,26 +1377,36 @@
     try {
       const stored = await loadSettings();
       if (captureSession !== sessionId) return false;
-      if (stored.captureDelay > 0 && !(await countDown(stored.captureDelay, captureSession))) {
+      // An opened image does not change while it waits, so it is saved at once.
+      if (
+        !imageSource &&
+        stored.captureDelay > 0 &&
+        !(await countDown(stored.captureDelay, captureSession))
+      ) {
         if (root && captureSession === sessionId) showToast(t("overlayCountdownStopped"));
         return false;
       }
       // Read after the countdown: the region and its marks may be adjusted while it runs.
       const selectedRect = { ...rect };
       const selectedMarks = marks.map((mark) => ({ ...mark }));
-      root.dataset.capturing = "true";
-      await nextFrame();
-      await nextFrame();
-      if (captureSession !== sessionId) return false;
-      const response = await chrome.runtime.sendMessage({ type: MESSAGE.CAPTURE_TAB });
-      if (!response || response.error) {
-        throw new Error(response?.error || t("overlayCaptureMissing"));
-      }
-      if (captureSession !== sessionId) return false;
       const copy = (action || stored.defaultAction) === "copy";
       // The clipboard only takes PNG, so a copy ignores the chosen file format.
       const settings = copy ? { ...stored, format: "png" } : stored;
-      const blob = await cropToBlob(response.dataUrl, selectedRect, settings, selectedMarks);
+      let blob;
+      if (imageSource) {
+        blob = await imageToBlob(imageSource, settings, selectedMarks);
+      } else {
+        root.dataset.capturing = "true";
+        await nextFrame();
+        await nextFrame();
+        if (captureSession !== sessionId) return false;
+        const response = await chrome.runtime.sendMessage({ type: MESSAGE.CAPTURE_TAB });
+        if (!response || response.error) {
+          throw new Error(response?.error || t("overlayCaptureMissing"));
+        }
+        if (captureSession !== sessionId) return false;
+        blob = await cropToBlob(response.dataUrl, selectedRect, settings, selectedMarks);
+      }
       if (captureSession !== sessionId) return false;
       const outcome = await deliver(blob, settings, copy);
       if (root && captureSession === sessionId) {
@@ -2137,6 +2185,29 @@
     return false;
   }
 
+  // Shows the marking tools over an image the editor page has loaded into `element`: the
+  // region is the image, locked at once, and `onClose` runs when it is closed with Esc or ×.
+  function openImage(element, { onClose } = {}) {
+    if (!(element instanceof HTMLImageElement) || !element.naturalWidth) return false;
+    const bounds = element.getBoundingClientRect();
+    const box = { left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height };
+    if (box.width < 1 || box.height < 1) return false;
+    // Opening another image replaces the one shown without closing the editor.
+    imageSource = null;
+    reset();
+    previousCursor = document.documentElement.style.cursor;
+    imageSource = { element, box, onClose };
+    state = STATE.LOCKED;
+    rect = { ...box };
+    injectOverlay();
+    root.dataset.source = "image";
+    root.dataset.mode = state;
+    document.addEventListener("mousedown", onLockedPageMouseDown, true);
+    document.addEventListener("keydown", onKeyDown, true);
+    applyRect(rect);
+    return true;
+  }
+
   function destroy() {
     reset();
     chrome.runtime.onMessage.removeListener(onRuntimeMessage);
@@ -2146,6 +2217,7 @@
 
   window.__regionSnapController = Object.freeze({
     version: CONTENT_VERSION,
+    openImage,
     destroy,
   });
 })();

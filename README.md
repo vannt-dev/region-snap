@@ -58,6 +58,12 @@ flowchart TB
   use. The highlighter keeps a colour of its own; the arrows, boxes, notes and steps share
   another, red by default, which also applies to the note being typed. Both are remembered for
   the next region and other pages; numbers and note outlines switch to dark ink on light colours.
+- **Mark up an image you already have**: popup → **Open or paste an image** opens an editor
+  tab. Open a PNG, JPEG, WebP, GIF, BMP or AVIF file, paste one with `Ctrl+V`, or drop one on the
+  page, then mark it with the same tools (arrow, box, highlight, hide, text, steps, colours,
+  undo). **Capture** saves it and **Copy** puts it on the clipboard, like a capture: the whole
+  image at its own resolution, with the format and file name from the settings.
+  It keeps its own corners. `Esc` closes the image; nothing leaves the browser.
 - **Capture full page** (popup, or `Alt+Shift+F`) scrolls the document a viewport at a time and
   stitches the slices into one image, without the scrollbar. A fixed header is kept in the first
   slice and a fixed footer in the last instead of repeating down the image; sticky elements sit
@@ -144,6 +150,9 @@ After every source change, click **Reload** on the extension card before testing
 
 For the whole page instead of a region, choose **Capture full page** in the popup or press
 `Alt+Shift+F`; it uses the image format and the default action from the settings.
+
+To mark up a screenshot or picture you already have, choose **Open or paste an image** in the
+popup, then open a file, press `Ctrl+V`, or drop the image on the page.
 
 Keyboard shortcuts can be changed at `chrome://extensions/shortcuts`.
 

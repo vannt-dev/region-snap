@@ -103,6 +103,17 @@
   "errorUnknownCaptureTab": { "message": "Không xác định được tab cần chụp." },
   "errorTabChanged": { "message": "Tab đã thay đổi trước khi ảnh được chụp." },
   "errorNoLockedRegion": { "message": "Chưa có vùng nào được khóa trên tab này." },
+  "popupOpenImage": { "message": "Mở hoặc dán một ảnh" },
+  "editorTitle": { "message": "Đánh dấu một ảnh" },
+  "editorOpen": { "message": "Mở ảnh" },
+  "editorPasteHint": { "message": "hoặc dán (Ctrl+V) hay kéo thả ảnh vào đây" },
+  "editorIntro": {
+    "message": "Mở một tệp ảnh, dán ảnh từ bộ nhớ tạm bằng Ctrl+V, hoặc kéo thả ảnh vào trang này. Đánh dấu bằng đúng các công cụ khi chụp, rồi lưu hoặc sao chép."
+  },
+  "editorNotImage": { "message": "Tệp này không phải ảnh PNG, JPEG, WebP, GIF, BMP hay AVIF." },
+  "editorReadError": { "message": "Không đọc được ảnh này." },
+  "editorTooLarge": { "message": "Ảnh quá lớn để chỉnh trong trình duyệt." },
+  "editorNoClipboardImage": { "message": "Bộ nhớ tạm không có ảnh nào." },
   "popupSettings": { "message": "Cài đặt" },
   "optionsTitle": { "message": "Cài đặt Region Snap" },
   "optionsFormat": { "message": "Định dạng ảnh" },
