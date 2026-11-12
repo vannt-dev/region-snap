@@ -34,6 +34,12 @@ bản nào không có ở đó thì không phải do vannt-dev phát hành.
   sang mực tối trên màu sáng.
 - Nút **Sao chép** đưa PNG vào clipboard thay vì tải về; trang không dùng được clipboard (ví dụ
   `http://` thường) sẽ tự chuyển sang tải file.
+- **Đánh dấu một ảnh có sẵn**: popup → **Mở hoặc dán một ảnh** mở một tab chỉnh ảnh. Mở tệp
+  PNG, JPEG, WebP, GIF, BMP hay AVIF, dán ảnh bằng `Ctrl+V`, hoặc kéo thả ảnh vào trang, rồi đánh
+  dấu bằng đúng các công cụ (mũi tên, khung, tô sáng, che, chữ, bước, màu, hoàn tác). **Chụp**
+  lưu ảnh và **Sao chép** đưa ảnh vào clipboard như khi chụp: cả ảnh ở đúng độ phân giải gốc, với
+  định dạng và tên tệp trong cài đặt. Ảnh giữ nguyên góc của nó. `Esc` đóng
+  ảnh; không gì rời khỏi trình duyệt.
 - **Chụp toàn trang** (popup, hoặc `Alt+Shift+F`) cuộn tài liệu từng khung nhìn một và ghép các
   lát thành một ảnh, không kèm thanh cuộn. Header cố định chỉ nằm ở lát đầu và footer cố định chỉ
   nằm ở lát cuối thay vì lặp lại suốt ảnh; phần tử sticky nằm đúng vị trí trong luồng. Chụp xong
@@ -109,6 +115,9 @@ Sau mỗi lần thay đổi source, bấm **Reload** tại thẻ extension trư�
 
 Muốn chụp cả trang thay vì một vùng, chọn **Chụp toàn trang** trong popup hoặc nhấn `Alt+Shift+F`;
 ảnh dùng định dạng và hành động mặc định trong cài đặt.
+
+Muốn đánh dấu một ảnh chụp hay hình có sẵn, chọn **Mở hoặc dán một ảnh** trong popup, rồi mở
+tệp, nhấn `Ctrl+V` hoặc kéo thả ảnh vào trang.
 
 Có thể thay đổi phím tắt tại `chrome://extensions/shortcuts`.
 

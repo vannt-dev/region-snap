@@ -1036,6 +1036,138 @@ try {
   await targetPage.keyboard.press("Escape");
   await targetPage.locator("#region-snap-root").waitFor({ state: "detached" });
 
+  // The editor page opens an image file or a pasted image under the same marking tools, and
+  // saves it whole at its own resolution, not as a screenshot of the window.
+  const editor = await context.newPage();
+  const editorErrors = [];
+  editor.on("pageerror", (error) => editorErrors.push(error.message));
+  await editor.setViewportSize({ width: 1000, height: 700 });
+  await editor.goto(`chrome-extension://${extensionId}/editor.html`);
+  await editor.locator('body[data-view="start"]').waitFor();
+  const makePng = (width, height) =>
+    editor.evaluate(
+      async ({ w, h }) => {
+        const canvas = globalThis.document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const context = canvas.getContext("2d");
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, w, h);
+        const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+        const bytes = new Uint8Array(await blob.arrayBuffer());
+        let binary = "";
+        for (const byte of bytes) binary += String.fromCharCode(byte);
+        return globalThis.btoa(binary);
+      },
+      { w: width, h: height },
+    );
+  const editorRoot = editor.locator('#region-snap-root[data-source="image"]');
+
+  await editor.locator("#file-input").setInputFiles({
+    name: "notes.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("not an image"),
+  });
+  await editor.locator("#error-message:not([hidden])").waitFor();
+
+  await editor.locator("#file-input").setInputFiles({
+    name: "wide.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(await makePng(1600, 800), "base64"),
+  });
+  await editorRoot.locator(".region-snap-toolbar").waitFor();
+  assert.equal(await editorRoot.getAttribute("data-mode"), "locked");
+  assert.equal(await editor.locator("#error-message").isHidden(), true);
+  assert.equal(await editor.locator(".region-snap-size").innerText(), "1600 × 800");
+  for (const hidden of ["grip", "scroll", "burst", "watch", "handle"]) {
+    assert.equal(await editor.locator(`.region-snap-${hidden}`).first().isHidden(), true, hidden);
+  }
+  const shown = await editor.locator(".stage__image").boundingBox();
+  assert.ok(shown.width < 1000 && shown.height < 700, "a large image is shrunk to the window");
+  assert.equal(Math.round((shown.width / shown.height) * 100), 200, "and keeps its shape");
+  const imageAt = (fx, fy) => ({ x: shown.x + shown.width * fx, y: shown.y + shown.height * fy });
+  await editor.locator('.region-snap-tool[data-tool="box"]').click();
+  await editor.mouse.move(imageAt(0.25, 0.25).x, imageAt(0.25, 0.25).y);
+  await editor.mouse.down();
+  await editor.mouse.move(imageAt(0.75, 0.75).x, imageAt(0.75, 0.75).y, { steps: 4 });
+  await editor.mouse.up();
+  assert.equal(await editor.locator(".region-snap-mark-svg rect").count(), 1);
+  const editorDownload = editor.waitForEvent("download");
+  await editor.locator(".region-snap-capture").click();
+  const savedImage = await editor.evaluate(
+    async (data) => {
+      const blob = await (await globalThis.fetch(`data:image/png;base64,${data}`)).blob();
+      const bitmap = await globalThis.createImageBitmap(blob);
+      const canvas = globalThis.document.createElement("canvas");
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      const context = canvas.getContext("2d");
+      context.drawImage(bitmap, 0, 0);
+      const pixel = (x, y) => Array.from(context.getImageData(x, y, 1, 1).data);
+      return {
+        width: bitmap.width,
+        height: bitmap.height,
+        corner: pixel(0, 0),
+        edge: pixel(800, 200),
+        middle: pixel(800, 400),
+      };
+    },
+    (await fs.readFile(await (await editorDownload).path())).toString("base64"),
+  );
+  await editor.locator('.region-snap-toast[data-kind="success"]').waitFor();
+  assert.equal(savedImage.width, 1600, "the image is saved at its own width");
+  assert.equal(savedImage.height, 800, "and its own height");
+  assert.deepEqual(savedImage.corner, [255, 255, 255, 255], "with square, untouched corners");
+  assert.deepEqual(savedImage.middle, [255, 255, 255, 255]);
+  assert.ok(
+    savedImage.edge[0] > 200 && savedImage.edge[1] < 120 && savedImage.edge[2] < 120,
+    `the box is drawn where it was marked, got ${savedImage.edge}`,
+  );
+  // Copy puts the same whole image on the clipboard, and nothing is downloaded.
+  let editorDownloads = 0;
+  editor.on("download", () => {
+    editorDownloads += 1;
+  });
+  const copiedText = await editor.evaluate(() =>
+    globalThis.chrome.i18n.getMessage("overlayCopied"),
+  );
+  await editor.locator(".region-snap-copy").click();
+  await editor.locator(".region-snap-toast", { hasText: copiedText }).waitFor();
+  const copiedSize = await editor.evaluate(async () => {
+    const [item] = await globalThis.navigator.clipboard.read();
+    const bitmap = await globalThis.createImageBitmap(await item.getType("image/png"));
+    return [bitmap.width, bitmap.height];
+  });
+  assert.deepEqual(copiedSize, [1600, 800]);
+  assert.equal(editorDownloads, 0, "a successful copy must not also download");
+
+  // A pasted image replaces the one shown and starts with no marks.
+  await editor.evaluate(
+    async (data) => {
+      const bytes = Uint8Array.from(globalThis.atob(data), (character) => character.charCodeAt(0));
+      const transfer = new globalThis.DataTransfer();
+      transfer.items.add(new globalThis.File([bytes], "pasted.png", { type: "image/png" }));
+      globalThis.document.dispatchEvent(
+        new globalThis.ClipboardEvent("paste", { clipboardData: transfer, bubbles: true }),
+      );
+    },
+    await makePng(300, 200),
+  );
+  await editor.locator(".region-snap-size", { hasText: "300 × 200" }).waitFor();
+  assert.equal(await editor.locator(".region-snap-mark-svg rect").count(), 0);
+  assert.equal(await editor.locator(".region-snap-undo").isDisabled(), true);
+  assert.equal(await editor.locator(".stage__image").count(), 1);
+
+  // Esc puts the tool down, the next one closes the image and goes back to the start screen.
+  await editor.locator('.region-snap-tool[data-tool="arrow"]').click();
+  await editor.keyboard.press("Escape");
+  await editor.keyboard.press("Escape");
+  await editor.locator("#region-snap-root").waitFor({ state: "detached" });
+  await editor.locator('body[data-view="start"]').waitFor();
+  assert.equal(await editor.locator(".stage__image").count(), 0);
+  assert.deepEqual(editorErrors, []);
+  await editor.close();
+
   const options = await context.newPage();
   const optionsErrors = [];
   options.on("pageerror", (error) => optionsErrors.push(error.message));
@@ -1093,8 +1225,15 @@ try {
   const manifest = JSON.parse(await fs.readFile(path.join(DIST_DIR, "manifest.json"), "utf8"));
   assert.equal(version, manifest.version);
   assert.deepEqual(pageErrors, []);
+  // The popup opens the editor in a tab of its own, then closes.
+  const [editorTab] = await Promise.all([
+    context.waitForEvent("page"),
+    page.locator("#open-editor").click(),
+  ]);
+  await editorTab.waitForURL(`chrome-extension://${extensionId}/editor.html`);
+  await editorTab.close();
   console.log(
-    `Smoke test passed for selection, marks, capture, delay, full page, scrolling capture, burst, capture on change, and popup v${version}.`,
+    `Smoke test passed for selection, marks, capture, delay, full page, scrolling capture, burst, capture on change, the image editor, and popup v${version}.`,
   );
 } finally {
   await context.close();

@@ -105,6 +105,17 @@
   "errorUnknownCaptureTab": { "message": "Could not identify the tab to capture." },
   "errorTabChanged": { "message": "The active tab changed before the screenshot was captured." },
   "errorNoLockedRegion": { "message": "No region is locked on this tab." },
+  "popupOpenImage": { "message": "Open or paste an image" },
+  "editorTitle": { "message": "Mark up an image" },
+  "editorOpen": { "message": "Open image" },
+  "editorPasteHint": { "message": "or paste (Ctrl+V) or drop one here" },
+  "editorIntro": {
+    "message": "Open an image file, paste one from the clipboard with Ctrl+V, or drop one on this page. Mark it with the same tools as a capture, then save or copy it."
+  },
+  "editorNotImage": { "message": "That file is not a PNG, JPEG, WebP, GIF, BMP or AVIF image." },
+  "editorReadError": { "message": "That image could not be read." },
+  "editorTooLarge": { "message": "That image is too large to edit in the browser." },
+  "editorNoClipboardImage": { "message": "There is no image on the clipboard." },
   "popupSettings": { "message": "Settings" },
   "optionsTitle": { "message": "Region Snap settings" },
   "optionsFormat": { "message": "Image format" },

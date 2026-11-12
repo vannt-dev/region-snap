@@ -1,0 +1,133 @@
+/*! SPDX-License-Identifier: MIT | Copyright (c) 2026 vannt-dev | github.com/vannt-dev/region-snap */
+:root {
+  color-scheme: dark;
+  --rs-primary: #3b82f6;
+  --rs-primary-hover: #60a5fa;
+  --rs-canvas: #0b1220;
+  --rs-surface: #111a2e;
+  --rs-text: #f1f5f9;
+  --rs-muted: #94a3b8;
+  --rs-border: #23304a;
+  --rs-danger: #f87171;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  color: var(--rs-text);
+  background: var(--rs-canvas);
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+.bar {
+  position: fixed;
+  inset: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 56px;
+  padding: 0 16px;
+  background: var(--rs-surface);
+  border-bottom: 1px solid var(--rs-border);
+}
+
+.bar__icon {
+  width: 24px;
+  height: 24px;
+}
+
+.bar__name {
+  margin-right: 8px;
+  font-size: 15px;
+}
+
+.bar__hint {
+  color: var(--rs-muted);
+  font-size: 13px;
+}
+
+.button {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 34px;
+  cursor: pointer;
+}
+
+.button--primary {
+  color: #ffffff;
+  background: var(--rs-primary);
+}
+
+.button--primary:hover {
+  background: var(--rs-primary-hover);
+}
+
+.button:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 2px;
+}
+
+.error-message {
+  margin: 0 0 0 auto;
+  color: var(--rs-danger);
+  font-size: 13px;
+}
+
+.start {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 140px 24px 0;
+  text-align: center;
+}
+
+.start h1 {
+  margin: 0 0 4px;
+  font-size: 24px;
+}
+
+.start p {
+  margin: 0 0 16px;
+  color: var(--rs-muted);
+  line-height: 1.5;
+}
+
+body[data-view="image"] .start {
+  display: none;
+}
+
+.stage__image {
+  position: fixed;
+  display: block;
+  max-width: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+
+@media (max-width: 640px) {
+  .bar__hint {
+    display: none;
+  }
+}

@@ -131,6 +131,11 @@ async function loadStatus() {
 primaryButton.addEventListener("click", () => runCommand(primaryCommand));
 secondaryButton.addEventListener("click", () => runCommand(MESSAGE.START_PICKING));
 fullPageButton.addEventListener("click", () => runCommand(MESSAGE.CAPTURE_FULL_PAGE));
+// Works on any tab, a page the overlay cannot reach included: the image opens in a tab of its own.
+document.getElementById("open-editor").addEventListener("click", async () => {
+  await chrome.tabs.create({ url: chrome.runtime.getURL("editor.html") });
+  window.close();
+});
 document.getElementById("open-settings").addEventListener("click", () => {
   chrome.runtime.openOptionsPage();
 });

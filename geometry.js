@@ -67,6 +67,38 @@
   // Chrome refuses a canvas taller or wider than 32767 px, or larger than 16384 × 16384 in area.
   const CANVAS_LIMITS = Object.freeze({ dimension: 32767, area: 268435456 });
 
+  // Whether an image can be drawn whole into one canvas.
+  function fitsCanvas(size, limits = CANVAS_LIMITS) {
+    return (
+      size.width >= 1 &&
+      size.height >= 1 &&
+      size.width <= limits.dimension &&
+      size.height <= limits.dimension &&
+      size.width * size.height <= limits.area
+    );
+  }
+
+  // Where an opened image is shown in the window: at its own size (`pixelRatio` image pixels
+  // per CSS pixel, so a screenshot shows as sharp as it was taken), shrunk to fit when it is
+  // larger, never enlarged. It sits below `top`, which leaves room for the toolbar, centred in
+  // the space left with `margin` around it.
+  function fitImage(image, view, { pixelRatio = 1, top = 0, margin = 0 } = {}) {
+    const ratio = pixelRatio > 0 ? pixelRatio : 1;
+    const naturalWidth = image.width / ratio;
+    const naturalHeight = image.height / ratio;
+    const roomWidth = Math.max(1, view.width - margin * 2);
+    const roomHeight = Math.max(1, view.height - top - margin);
+    const scale = Math.min(1, roomWidth / naturalWidth, roomHeight / naturalHeight);
+    const width = Math.max(1, Math.round(naturalWidth * scale));
+    const height = Math.max(1, Math.round(naturalHeight * scale));
+    return {
+      left: Math.round(Math.max(0, view.width - width) / 2),
+      top: Math.round(top + Math.max(0, roomHeight - height) / 2),
+      width,
+      height,
+    };
+  }
+
   // Plans a full-page capture: the scroll offsets to photograph, one viewport apart, and the
   // size of the stitched image. `page` is in CSS pixels; `scale` is image pixels per CSS pixel.
   // A page that would not fit in one canvas is cut at the limit and reported as truncated.
@@ -149,7 +181,9 @@
     CANVAS_LIMITS,
     canScrollY,
     clamp,
+    fitImage,
     fitRectToBounds,
+    fitsCanvas,
     getCropMetrics,
     moveRectTo,
     planFullPage,
