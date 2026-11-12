@@ -109,6 +109,16 @@ try {
     "wait",
     "the page cursor should be restored after selection",
   );
+  assert.deepEqual(
+    await targetPage.evaluate(() => {
+      const style = globalThis.getComputedStyle(
+        globalThis.document.querySelector(".region-snap-capture"),
+      );
+      return [style.backgroundColor, style.color];
+    }),
+    ["rgb(37, 99, 235)", "rgb(255, 255, 255)"],
+    "the Capture button keeps its own colours over the toolbar's button reset",
+  );
 
   let downloadCount = 0;
   targetPage.on("download", () => {

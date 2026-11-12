@@ -162,7 +162,7 @@
   animation: rs-toolbar-in 150ms ease-out !important;
 }
 
-#region-snap-root .region-snap-toolbar button {
+#region-snap-root .region-snap-toolbar :where(button) {
   all: initial !important;
   height: 28px !important;
   padding: 0 10px !important;
