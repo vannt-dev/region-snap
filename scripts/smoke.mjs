@@ -1046,6 +1046,97 @@ try {
   await targetPage.keyboard.press("Escape");
   await targetPage.locator("#region-snap-root").waitFor({ state: "detached" });
 
+  // Copy text reads the page's own text inside the region, in reading order, and leaves out
+  // hidden text, password fields, text clipped by a scrolling box and words outside the region.
+  await targetPage.evaluate(() => {
+    const { document } = globalThis;
+    document.body.style.cssText = "margin: 0; padding: 0; background: #fff";
+    document.body.innerHTML = `
+      <div style="position: absolute; left: 40px; top: 40px; width: 600px; font: 16px/20px sans-serif">
+        <p style="margin: 0">Hello <b>wor</b>ld and <a href="#">links</a></p>
+        <p style="margin: 0">Second line</p>
+        <p style="margin: 20px 0 0">Tiếng Việt có dấu</p>
+        <p style="margin: 0; visibility: hidden">Hidden secret</p>
+        <div style="height: 20px; overflow: hidden"><div style="height: 20px">Shown</div><div>Clipped away</div></div>
+        <input type="password" value="hunter2" style="display: block; width: 200px; height: 24px">
+        <input value="Field value" style="display: block; width: 200px; height: 24px">
+      </div>
+      <p style="position: absolute; left: 40px; top: 400px; margin: 0">Outside the region</p>
+      <div id="text-shadow" style="position: absolute; left: 40px; top: 300px; font: 16px/20px sans-serif"></div>`;
+    document.getElementById("text-shadow").attachShadow({ mode: "open" }).innerHTML =
+      "<span>From a shadow root</span>";
+    globalThis.scrollTo(0, 0);
+  });
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  const setClipboard = (text) =>
+    targetPage.evaluate((value) => globalThis.navigator.clipboard.writeText(value), text);
+  // Windows hands clipboard text back with CRLF line ends.
+  const readClipboard = async () =>
+    (await targetPage.evaluate(() => globalThis.navigator.clipboard.readText())).replace(
+      /\r\n/g,
+      "\n",
+    );
+  const selectArea = async (from, to) => {
+    await startPicking();
+    await targetPage.mouse.move(from.x, from.y);
+    await targetPage.mouse.down();
+    await targetPage.mouse.move(to.x, to.y, { steps: 6 });
+    await targetPage.mouse.up();
+    await targetPage.locator('#region-snap-root[data-mode="locked"]').waitFor();
+  };
+  const expectedText = [
+    "Hello world and links",
+    "Second line",
+    "",
+    "Tiếng Việt có dấu",
+    "",
+    "Shown",
+    "",
+    "Field value",
+    "",
+    "From a shadow root",
+  ].join("\n");
+  const downloadsBeforeText = downloadCount;
+  await setClipboard("before");
+  await selectArea({ x: 30, y: 30 }, { x: 700, y: 340 });
+  await targetPage.locator(".region-snap-copy-text").click();
+  await targetPage.locator(".region-snap-toast", { hasText: "overlayTextCopied" }).waitFor();
+  assert.equal(await readClipboard(), expectedText);
+  assert.equal(downloadCount, downloadsBeforeText, "Copy text saves no image");
+  assert.equal(
+    await targetPage.locator('#region-snap-root[data-mode="locked"]').count(),
+    1,
+    "the region stays after Copy text",
+  );
+
+  // T on the grip does the same; without the async clipboard the hidden field is used.
+  await setClipboard("before");
+  await evaluateIsolated(
+    'Object.defineProperty(globalThis.navigator, "clipboard", { value: undefined, configurable: true })',
+  );
+  await targetPage.locator(".region-snap-grip").focus();
+  await targetPage.keyboard.press("t");
+  await targetPage.locator(".region-snap-toast", { hasText: "overlayTextCopied" }).waitFor();
+  assert.equal(await readClipboard(), expectedText);
+  await evaluateIsolated("delete globalThis.navigator.clipboard");
+  assert.equal(
+    await targetPage.locator(".region-snap-clipboard").count(),
+    0,
+    "the hidden field is removed",
+  );
+
+  // A region with no text leaves the clipboard alone and says so.
+  await targetPage.keyboard.press("Escape");
+  await targetPage.locator("#region-snap-root").waitFor({ state: "detached" });
+  await setClipboard("unchanged");
+  await selectArea({ x: 700, y: 450 }, { x: 900, y: 600 });
+  await targetPage.locator(".region-snap-grip").focus();
+  await targetPage.keyboard.press("t");
+  await targetPage.locator(".region-snap-toast", { hasText: "overlayNoTextFound" }).waitFor();
+  assert.equal(await readClipboard(), "unchanged");
+  await targetPage.keyboard.press("Escape");
+  await targetPage.locator("#region-snap-root").waitFor({ state: "detached" });
+
   // The editor page opens an image file or a pasted image under the same marking tools, and
   // saves it whole at its own resolution, not as a screenshot of the window.
   const editor = await context.newPage();

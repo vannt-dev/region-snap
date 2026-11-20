@@ -29,6 +29,15 @@
   "overlayResize": { "message": "Đổi kích thước vùng" },
   "overlayCapture": { "message": "Chụp" },
   "overlayCopy": { "message": "Sao chép" },
+  "overlayCopyText": { "message": "Sao chép chữ" },
+  "overlayCopyTextTitle": { "message": "Sao chép chữ của trang trong vùng (T)" },
+  "overlayNoTextFound": { "message": "Không tìm thấy chữ trong vùng đã chọn." },
+  "overlayCopyTextFailed": { "message": "Trang này chặn clipboard — chưa sao chép được chữ" },
+  "overlayTextCopiedOne": { "message": "Đã sao chép 1 dòng chữ" },
+  "overlayTextCopied": {
+    "message": "Đã sao chép $COUNT$ dòng chữ",
+    "placeholders": { "count": { "content": "$1" } }
+  },
   "overlayCancel": { "message": "Hủy" },
   "overlayToolArrow": { "message": "Vẽ mũi tên" },
   "overlayToolHighlight": { "message": "Tô sáng một vùng" },
