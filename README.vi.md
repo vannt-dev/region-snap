@@ -17,6 +17,11 @@ bản nào không có ở đó thì không phải do vannt-dev phát hành.
 - Di chuyển và đổi kích thước vùng đã khóa.
 - Trang bên dưới vẫn tương tác bình thường sau khi khóa vùng.
 - Chụp bằng toolbar, phím `Enter` hoặc `Alt+Shift+C`.
+- **Sao chép chữ** đưa chữ trong vùng vào clipboard thay vì ảnh: bấm nút, hoặc nhấn `T` khi nút `⠿`
+  đang được focus (nút này tự nhận focus khi vùng khoá). Tiện ích đọc chính chữ của trang nên chính
+  xác và tức thì, không cần nhận dạng chữ: các dòng theo thứ tự đọc, một dòng trống giữa các đoạn,
+  và giá trị của ô nhập chữ. Chữ bị ẩn, ô mật khẩu và chữ bị cuộn khuất được bỏ qua. Chữ nằm trong
+  ảnh, canvas hoặc iframe thì không đọc được. Nếu vùng không có chữ, clipboard được giữ nguyên.
 - Đánh dấu lên vùng đã khoá trước khi chụp: thanh công cụ vẽ **mũi tên** `↗`, **khung** `▢`, hoặc
   **che một vùng** `▒` bằng mosaic; `↶` (hoặc `Ctrl+Z` khi đang cầm công cụ) bỏ nét vẽ gần nhất. Khi
   đã chọn công cụ, kéo trong vùng chọn để vẽ; nhấn `Esc` để bỏ công cụ và trang tương tác lại như
@@ -110,7 +115,8 @@ Sau mỗi lần thay đổi source, bấm **Reload** tại thẻ extension trư�
 2. Bấm vào một phần tử, hoặc kéo chuột để chọn vùng tự do.
 3. Dùng các nút tròn để đổi kích thước; kéo nút `⠿` để di chuyển.
 4. Tương tác với trang nếu cần tạo đúng trạng thái muốn chụp.
-5. Bấm **Capture**, nhấn `Enter`, hoặc dùng `Alt+Shift+C`.
+5. Bấm **Capture**, nhấn `Enter`, hoặc dùng `Alt+Shift+C`. Muốn lấy chữ thay vì ảnh thì bấm
+   **Copy text** (Sao chép chữ) hoặc nhấn `T`.
 6. Nhấn `Esc` hoặc nút **×** để đóng overlay.
 
 Muốn chụp cả trang thay vì một vùng, chọn **Chụp toàn trang** trong popup hoặc nhấn `Alt+Shift+F`;

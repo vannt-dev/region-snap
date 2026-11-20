@@ -43,6 +43,12 @@ flowchart TB
 - Capture from the toolbar, `Enter`, or `Alt+Shift+C`.
 - **Copy** puts the PNG on the clipboard instead of downloading it; pages where the clipboard is
   unavailable (plain `http://`, for example) get the download as a fallback.
+- **Copy text** puts the text inside the region on the clipboard instead of an image: click the
+  button, or press `T` while the `⠿` handle has the focus (it does when a region locks). It reads
+  the page's own text, so it is exact and instant, with no text recognition: lines in reading
+  order, a blank line between paragraphs, and the values of text fields. Hidden text, password
+  fields and text scrolled out of view are left out. Text drawn in images or canvases, and text
+  inside frames, is not read. With no text in the region the clipboard is left as it was.
 - Mark the locked region before capturing: the toolbar draws an **arrow** `↗`, a **box** `▢`, or
   **hides an area** `▒` behind a mosaic, and `↶` (or `Ctrl+Z` while a tool is held) removes the last
   mark. With a tool chosen a drag inside the region draws; `Esc` puts the tool down and the page is
@@ -145,7 +151,8 @@ After every source change, click **Reload** on the extension card before testing
 2. Click an element, or drag to select a free-form region.
 3. Use the round handles to resize; drag the `⠿` handle to move the region.
 4. Interact with the page as needed to reach the exact state you want to capture.
-5. Click **Capture**, press `Enter`, or use `Alt+Shift+C`.
+5. Click **Capture**, press `Enter`, or use `Alt+Shift+C`. To take the text instead of an image,
+   click **Copy text** or press `T`.
 6. Press `Esc` or the **×** button to close the overlay.
 
 For the whole page instead of a region, choose **Capture full page** in the popup or press

@@ -177,8 +177,92 @@
     };
   }
 
+  // Copy text keeps a word from the page when the centre of its box lies inside the region, so a
+  // word cut by the edge goes with the side that holds most of it.
+  function boxCenterInRect(box, rect) {
+    if (!(box.width > 0) || !(box.height > 0)) return false;
+    const x = box.left + box.width / 2;
+    const y = box.top + box.height / 2;
+    return (
+      x >= rect.left && x <= rect.left + rect.width && y >= rect.top && y <= rect.top + rect.height
+    );
+  }
+
+  // Lines are tidied the way the desktop app tidies recognised text: NFC, runs of spaces and tabs
+  // made one space, lines trimmed, at most one blank line in a row and none at either end.
+  function tidyLines(raw) {
+    const lines = String(raw ?? "")
+      .normalize("NFC")
+      .replace(/\r\n?/g, "\n")
+      .split("\n")
+      .map((line) => line.replace(/\s+/g, " ").trim());
+    const kept = [];
+    for (const line of lines) {
+      if (line || (kept.length && kept[kept.length - 1])) kept.push(line);
+    }
+    while (kept.length && !kept[kept.length - 1]) kept.pop();
+    return { text: kept.join("\n"), lineCount: kept.filter(Boolean).length };
+  }
+
+  // Turns the words found in a region (`text` plus a viewport box, `spaceBefore`/`spaceAfter`
+  // when the page has white space there) into text in reading order: words whose boxes share a
+  // row form a line, left to right; a gap taller than most of a line starts a new paragraph.
+  function regionText(fragments) {
+    const words = fragments
+      .filter((fragment) => fragment.height > 0 && String(fragment.text ?? "").trim())
+      .map((fragment) => ({ ...fragment, middle: fragment.top + fragment.height / 2 }))
+      .sort((a, b) => a.middle - b.middle || a.left - b.left);
+
+    const lines = [];
+    for (const word of words) {
+      const line = lines[lines.length - 1];
+      const overlap = line
+        ? Math.min(line.anchorTop + line.anchorHeight, word.top + word.height) -
+          Math.max(line.anchorTop, word.top)
+        : -1;
+      if (line && overlap >= Math.min(line.anchorHeight, word.height) / 2) {
+        line.words.push(word);
+        line.bottom = Math.max(line.bottom, word.top + word.height);
+      } else {
+        lines.push({
+          words: [word],
+          anchorTop: word.top,
+          anchorHeight: word.height,
+          top: word.top,
+          bottom: word.top + word.height,
+        });
+      }
+    }
+
+    const output = [];
+    lines.forEach((line, index) => {
+      const previous = lines[index - 1];
+      if (previous) {
+        const gap = line.top - previous.bottom;
+        if (gap > Math.min(previous.anchorHeight, line.anchorHeight) * 0.75) output.push("");
+      }
+      let text = "";
+      let before = null;
+      for (const word of line.words.sort((a, b) => a.left - b.left)) {
+        if (before) {
+          const gap = word.left - (before.left + before.width);
+          const spaced =
+            before.spaceAfter ||
+            word.spaceBefore ||
+            gap > Math.min(before.height, word.height) * 0.2;
+          if (spaced) text += " ";
+        }
+        text += word.text;
+        before = word;
+      }
+      output.push(text);
+    });
+    return tidyLines(output.join("\n"));
+  }
+
   const api = Object.freeze({
     CANVAS_LIMITS,
+    boxCenterInRect,
     canScrollY,
     clamp,
     fitImage,
@@ -189,6 +273,7 @@
     planFullPage,
     planScrollCapture,
     rectFromPoints,
+    regionText,
     resizeRect,
     scrollSlice,
   });

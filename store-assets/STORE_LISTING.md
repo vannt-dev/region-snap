@@ -27,6 +27,7 @@ Key features:
 - Full-page capture, and capture of a scrolling panel or an element taller than the window
 - Burst shots and capture on change, saved as numbered files
 - Copy to the clipboard, a capture delay, and PNG, JPEG or WebP output
+- Copy text: put the page text inside the region on the clipboard
 - Accurate cropping across browser zoom and display scaling
 - Rounded PNG output with transparent corners
 - Keyboard shortcuts for fast selection and capture

@@ -29,6 +29,15 @@
   "overlayResize": { "message": "Resize region" },
   "overlayCapture": { "message": "Capture" },
   "overlayCopy": { "message": "Copy" },
+  "overlayCopyText": { "message": "Copy text" },
+  "overlayCopyTextTitle": { "message": "Copy the page text inside the region (T)" },
+  "overlayNoTextFound": { "message": "No text found in the selection." },
+  "overlayCopyTextFailed": { "message": "This page blocks the clipboard — text not copied" },
+  "overlayTextCopiedOne": { "message": "Copied 1 line of text" },
+  "overlayTextCopied": {
+    "message": "Copied $COUNT$ lines of text",
+    "placeholders": { "count": { "content": "$1" } }
+  },
   "overlayCancel": { "message": "Cancel" },
   "overlayToolArrow": { "message": "Draw an arrow" },
   "overlayToolBox": { "message": "Draw a box" },

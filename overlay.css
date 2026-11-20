@@ -216,12 +216,25 @@
   background: var(--rs-primary-hover) !important;
 }
 
-#region-snap-root .region-snap-copy {
+#region-snap-root .region-snap-copy,
+#region-snap-root .region-snap-copy-text {
   color: #e2e8f0 !important;
   background: #1e293b !important;
 }
-#region-snap-root .region-snap-copy:hover {
+#region-snap-root .region-snap-copy:hover,
+#region-snap-root .region-snap-copy-text:hover {
   background: #334155 !important;
+}
+
+/* The hidden field Copy text writes through when the page has no async clipboard. */
+#region-snap-root .region-snap-clipboard {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 1px !important;
+  height: 1px !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 #region-snap-root .region-snap-cancel {
@@ -608,6 +621,7 @@
 #region-snap-root[data-source="image"] .region-snap-grip,
 #region-snap-root[data-source="image"] .region-snap-scroll,
 #region-snap-root[data-source="image"] .region-snap-burst,
-#region-snap-root[data-source="image"] .region-snap-watch {
+#region-snap-root[data-source="image"] .region-snap-watch,
+#region-snap-root[data-source="image"] .region-snap-copy-text {
   display: none !important;
 }

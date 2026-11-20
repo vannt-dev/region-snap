@@ -127,7 +127,7 @@
   // A press that travels less than this is a click on a note, not a drag of it.
   const CLICK_SLOP = 3;
   // About the widest the toolbar gets: with a tool held it also shows the mark colours.
-  const TOOLBAR_WIDTH = 840;
+  const TOOLBAR_WIDTH = 940;
   // Capture on change waits for the region to be still this long, but never longer than the
   // second value after the first change, so content that never settles is still captured.
   const WATCH_QUIET_MS = 400;
@@ -200,6 +200,7 @@
       <span class="region-snap-run" aria-live="polite"></span>
       <button class="region-snap-capture" type="button">${t("overlayCapture")}</button>
       <button class="region-snap-copy" type="button">${t("overlayCopy")}</button>
+      <button class="region-snap-copy-text" type="button" title="${t("overlayCopyTextTitle")}">${t("overlayCopyText")}</button>
       <button class="region-snap-cancel" type="button" title="${t("overlayCancel")}" aria-label="${t("overlayCancel")}">×</button>
     `;
     gripButton = toolbar.querySelector(".region-snap-grip");
@@ -259,6 +260,9 @@
     });
     toolbar.querySelector(".region-snap-copy").addEventListener("click", (event) => {
       if (event.isTrusted) doCapture({ action: "copy" });
+    });
+    toolbar.querySelector(".region-snap-copy-text").addEventListener("click", (event) => {
+      if (event.isTrusted) copyRegionText();
     });
     toolbar.querySelector(".region-snap-cancel").addEventListener("click", (event) => {
       if (event.isTrusted) reset();
@@ -1081,6 +1085,21 @@
       doCapture();
       return;
     }
+    // T copies the region's text, like on the desktop app. Only from the grip, like Enter, so
+    // typing on the page around a locked region is left alone.
+    if (
+      event.key.toLowerCase() === "t" &&
+      state === STATE.LOCKED &&
+      event.target === gripButton &&
+      !event.ctrlKey &&
+      !event.altKey &&
+      !event.metaKey
+    ) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      copyRegionText();
+      return;
+    }
     if (moveWithKeyboard(event)) event.preventDefault();
   }
 
@@ -1359,6 +1378,181 @@
       stopCountdown = () => finish(false);
       tick();
     });
+  }
+
+  // Copy text reads the words the page itself shows inside the region, so it is exact and needs
+  // no text recognition. Script and style text, hidden text, text clipped away by a scrolling
+  // box, password fields and the overlay itself are left out.
+  const SKIPPED_TEXT_PARENTS = new Set([
+    "SCRIPT",
+    "STYLE",
+    "NOSCRIPT",
+    "TEMPLATE",
+    "TEXTAREA",
+    "SELECT",
+    "OPTION",
+    "IFRAME",
+    "OBJECT",
+  ]);
+  const TEXT_FIELD_TYPES = new Set(["text", "search", "email", "url", "tel", "number"]);
+
+  function intersects(box, area) {
+    return (
+      box.width > 0 &&
+      box.height > 0 &&
+      box.left < area.left + area.width &&
+      box.left + box.width > area.left &&
+      box.top < area.top + area.height &&
+      box.top + box.height > area.top
+    );
+  }
+
+  function collectRegionText(area) {
+    const fragments = [];
+    const visibleAreas = new Map();
+    // The part of the viewport an element's content can show in: clipped by every scrolling
+    // or overflow-hidden box around it.
+    const visibleArea = (element) => {
+      if (!element || element === document.documentElement) return area;
+      if (visibleAreas.has(element)) return visibleAreas.get(element);
+      const parent = element.parentElement || element.getRootNode()?.host || null;
+      let result = visibleArea(parent);
+      const style = getComputedStyle(element);
+      if (result && (style.overflowX !== "visible" || style.overflowY !== "visible")) {
+        const bounds = element.getBoundingClientRect();
+        const left = Math.max(result.left, bounds.left);
+        const top = Math.max(result.top, bounds.top);
+        const right = Math.min(result.left + result.width, bounds.right);
+        const bottom = Math.min(result.top + result.height, bounds.bottom);
+        result =
+          right > left && bottom > top
+            ? { left, top, width: right - left, height: bottom - top }
+            : null;
+      }
+      visibleAreas.set(element, result);
+      return result;
+    };
+    const shown = (element, box) => {
+      const clip = visibleArea(element);
+      return Boolean(clip) && Geometry.boxCenterInRect(box, clip);
+    };
+    const range = document.createRange();
+
+    const readTextNode = (node) => {
+      const parent = node.parentElement;
+      const value = node.nodeValue;
+      if (!parent || !value.trim() || SKIPPED_TEXT_PARENTS.has(parent.tagName)) return;
+      range.selectNodeContents(node);
+      if (!intersects(range.getBoundingClientRect(), area)) return;
+      if (getComputedStyle(parent).visibility !== "visible") return;
+      for (const match of value.matchAll(/\S+/g)) {
+        const start = match.index;
+        const end = start + match[0].length;
+        range.setStart(node, start);
+        range.setEnd(node, end);
+        const box = [...range.getClientRects()].find((item) => item.width > 0 && item.height > 0);
+        if (!box || !Geometry.boxCenterInRect(box, area) || !shown(parent, box)) continue;
+        fragments.push({
+          text: match[0],
+          left: box.left,
+          top: box.top,
+          width: box.width,
+          height: box.height,
+          spaceBefore: start > 0,
+          spaceAfter: end < value.length,
+        });
+      }
+    };
+
+    const readField = (element) => {
+      if (element instanceof HTMLInputElement && !TEXT_FIELD_TYPES.has(element.type)) return;
+      if (!element.value.trim()) return;
+      const box = element.getBoundingClientRect();
+      if (!Geometry.boxCenterInRect(box, area) || !shown(element, box)) return;
+      if (getComputedStyle(element).visibility !== "visible") return;
+      fragments.push({
+        text: element.value,
+        left: box.left,
+        top: box.top,
+        width: box.width,
+        height: box.height,
+      });
+    };
+
+    const visit = (node) => {
+      for (let child = node.firstChild; child; child = child.nextSibling) {
+        if (child.nodeType === Node.TEXT_NODE) {
+          readTextNode(child);
+        } else if (child.nodeType === Node.ELEMENT_NODE) {
+          if (isOwnElement(child)) continue;
+          if (child instanceof HTMLInputElement || child instanceof HTMLTextAreaElement) {
+            readField(child);
+            continue;
+          }
+          if (SKIPPED_TEXT_PARENTS.has(child.tagName)) continue;
+          if (child.shadowRoot) visit(child.shadowRoot);
+          visit(child);
+        }
+      }
+    };
+    if (document.body) visit(document.body);
+    return Geometry.regionText(fragments);
+  }
+
+  // Writes text to the clipboard: the async API first, then a hidden textarea and
+  // execCommand for pages (plain http, a strict Permissions-Policy) where that API is missing.
+  async function writeClipboardText(text) {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (error) {
+      console.warn("Region Snap clipboard write failed:", error);
+    }
+    if (!root) return false;
+    const field = document.createElement("textarea");
+    field.className = "region-snap-clipboard";
+    field.value = text;
+    field.setAttribute("readonly", "");
+    field.setAttribute("aria-hidden", "true");
+    root.appendChild(field);
+    const focused = document.activeElement;
+    try {
+      field.select();
+      return document.execCommand("copy");
+    } catch {
+      return false;
+    } finally {
+      field.remove();
+      if (focused instanceof HTMLElement) focused.focus({ preventScroll: true });
+    }
+  }
+
+  // Puts the text inside the locked region on the clipboard. Like the desktop app: no image is
+  // made, and when there is no text the clipboard is left as it was and the region stays.
+  async function copyRegionText() {
+    if (state !== STATE.LOCKED || !rect) {
+      showToast(t("overlaySelectFirst"), "error");
+      return false;
+    }
+    if (capturing || imageSource) return false;
+    const { text, lineCount } = collectRegionText({ ...rect });
+    if (!lineCount) {
+      showToast(t("overlayNoTextFound"), "error");
+      return false;
+    }
+    if (!(await writeClipboardText(text))) {
+      if (root) showToast(t("overlayCopyTextFailed"), "error");
+      return false;
+    }
+    if (root) {
+      showToast(
+        lineCount === 1 ? t("overlayTextCopiedOne") : t("overlayTextCopied", [String(lineCount)]),
+        "success",
+      );
+    }
+    return true;
   }
 
   // `action` is "download" or "copy"; left out, the user's default action applies.

@@ -280,3 +280,75 @@ test("tells whether an image fits in one canvas", () => {
   assert.equal(geometry.fitsCanvas({ width: 20000, height: 20000 }), false);
   assert.equal(geometry.fitsCanvas({ width: 0, height: 10 }), false);
 });
+
+// Copy text: words read from the page, each with its viewport box, become lines of text.
+const word = (text, left, top, extra = {}) => ({
+  text,
+  left,
+  top,
+  width: text.length * 8,
+  height: 16,
+  ...extra,
+});
+
+test("keeps a word whose centre is inside the region", () => {
+  const region = { left: 100, top: 100, width: 200, height: 100 };
+  assert.equal(
+    geometry.boxCenterInRect({ left: 90, top: 110, width: 40, height: 16 }, region),
+    true,
+  );
+  assert.equal(
+    geometry.boxCenterInRect({ left: 60, top: 110, width: 40, height: 16 }, region),
+    false,
+  );
+  assert.equal(
+    geometry.boxCenterInRect({ left: 120, top: 195, width: 40, height: 16 }, region),
+    false,
+  );
+  assert.equal(
+    geometry.boxCenterInRect({ left: 120, top: 120, width: 0, height: 0 }, region),
+    false,
+  );
+});
+
+test("orders words into lines top to bottom and left to right", () => {
+  const result = geometry.regionText([
+    word("world", 60, 10, { spaceBefore: true }),
+    word("Second", 0, 30),
+    word("Hello", 0, 10),
+    word("line", 60, 31, { spaceBefore: true }),
+  ]);
+  assert.deepEqual(result, { text: "Hello world\nSecond line", lineCount: 2 });
+});
+
+test("joins pieces of one word and spaces words that sit apart", () => {
+  const result = geometry.regionText([
+    word("Hel", 0, 10),
+    word("lo", 24, 10),
+    word("Price", 200, 10),
+    word("12", 260, 10, { spaceBefore: true }),
+  ]);
+  assert.equal(result.text, "Hello Price 12");
+});
+
+test("keeps one blank line between paragraphs", () => {
+  const result = geometry.regionText([
+    word("First", 0, 0),
+    word("Next", 0, 20),
+    word("Far", 0, 80),
+    word("Farther", 0, 300),
+  ]);
+  assert.deepEqual(result, { text: "First\nNext\n\nFar\n\nFarther", lineCount: 4 });
+});
+
+test("tidies text like the desktop app and counts no lines when empty", () => {
+  const result = geometry.regionText([
+    word("Tiếng", 0, 0),
+    word("  Việt  ", 50, 0, { spaceBefore: true }),
+    word("a\tb\n\n\nc", 0, 20),
+  ]);
+  assert.equal(result.text, "Tiếng Việt\na b\n\nc");
+  assert.equal(result.lineCount, 3);
+  assert.deepEqual(geometry.regionText([]), { text: "", lineCount: 0 });
+  assert.deepEqual(geometry.regionText([word("   ", 0, 0)]), { text: "", lineCount: 0 });
+});
