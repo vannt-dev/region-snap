@@ -1,7 +1,8 @@
 /*! SPDX-License-Identifier: MIT | Copyright (c) 2026 vannt-dev | github.com/vannt-dev/region-snap */
 importScripts("shared.js");
 
-const { ALLOWED_PROTOCOLS, COMMAND_TO_MESSAGE, MESSAGE, STATE } = globalThis.RegionSnapShared;
+const { ALLOWED_PROTOCOLS, COMMAND_TO_MESSAGE, MESSAGE, OFFSCREEN_TARGET, STATE } =
+  globalThis.RegionSnapShared;
 const allowedProtocols = new Set(ALLOWED_PROTOCOLS);
 const validCommands = new Set(Object.values(COMMAND_TO_MESSAGE));
 const injectionTasks = new Map();
@@ -165,6 +166,76 @@ async function captureSenderTab(sender) {
   }
 }
 
+// Text is read from an image in an offscreen document: a service worker cannot start the
+// dedicated worker Tesseract runs in, and the document holds Tesseract's memory only while it
+// works. Reads take turns, and the document closes after the last one.
+const OFFSCREEN_URL = "ocr.html";
+let textReads = Promise.resolve();
+let waitingTextReads = 0;
+
+function canReadImageText() {
+  return (
+    typeof chrome.offscreen?.createDocument === "function" &&
+    "WORKERS" in (chrome.offscreen.Reason || {})
+  );
+}
+
+async function hasOffscreenDocument() {
+  if (typeof chrome.runtime.getContexts !== "function") return false;
+  const contexts = await chrome.runtime.getContexts({
+    contextTypes: ["OFFSCREEN_DOCUMENT"],
+    documentUrls: [chrome.runtime.getURL(OFFSCREEN_URL)],
+  });
+  return contexts.length > 0;
+}
+
+async function openOffscreenDocument() {
+  if (await hasOffscreenDocument()) return;
+  try {
+    await chrome.offscreen.createDocument({
+      url: OFFSCREEN_URL,
+      reasons: [chrome.offscreen.Reason.WORKERS],
+      justification: "Recognise the text in a captured region with the bundled Tesseract worker.",
+    });
+  } catch (error) {
+    // Without getContexts (before Chrome 116) a document left open by a service worker that
+    // has since restarted is only found this way.
+    if (!/single offscreen document/i.test(error?.message || "")) throw error;
+  }
+}
+
+async function readTextNow(dataUrl) {
+  await openOffscreenDocument();
+  const response = await chrome.runtime.sendMessage({
+    target: OFFSCREEN_TARGET,
+    type: MESSAGE.RECOGNIZE_TEXT,
+    dataUrl,
+  });
+  if (!response || response.error) throw new Error(response?.error || t("errorReadText"));
+  return { text: String(response.text || ""), lineCount: Number(response.lineCount) || 0 };
+}
+
+async function readImageText(dataUrl) {
+  if (!canReadImageText()) return { error: t("errorReadTextUnsupported") };
+  if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/")) {
+    return { error: t("errorReadText") };
+  }
+  waitingTextReads += 1;
+  const turn = textReads.then(async () => {
+    try {
+      return await readTextNow(dataUrl);
+    } catch (error) {
+      console.warn("Region Snap text recognition failed:", error);
+      return { error: error?.message || t("errorReadText") };
+    } finally {
+      waitingTextReads -= 1;
+      if (!waitingTextReads) await chrome.offscreen.closeDocument().catch(() => {});
+    }
+  });
+  textReads = turn;
+  return turn;
+}
+
 chrome.commands.onCommand.addListener(async (command, tab) => {
   const type = COMMAND_TO_MESSAGE[command];
   if (!type) return;
@@ -185,6 +256,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message?.type === MESSAGE.RUN_COMMAND) {
     runPopupCommand(message.command).then(sendResponse);
+    return true;
+  }
+
+  if (message?.type === MESSAGE.READ_IMAGE_TEXT && sender.tab) {
+    readImageText(message.dataUrl).then(sendResponse);
     return true;
   }
 

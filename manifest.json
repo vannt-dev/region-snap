@@ -5,8 +5,8 @@
   "description": "__MSG_extensionDescription__",
   "default_locale": "en",
   "homepage_url": "https://github.com/vannt-dev/region-snap",
-  "minimum_chrome_version": "102",
-  "permissions": ["activeTab", "scripting", "storage"],
+  "minimum_chrome_version": "113",
+  "permissions": ["activeTab", "offscreen", "scripting", "storage"],
   "commands": {
     "toggle-picker": {
       "suggested_key": { "default": "Alt+Shift+S" },
@@ -20,6 +20,9 @@
       "suggested_key": { "default": "Alt+Shift+F" },
       "description": "__MSG_commandFullPage__"
     }
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
   },
   "background": {
     "service_worker": "background.js"

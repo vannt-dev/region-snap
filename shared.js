@@ -6,9 +6,15 @@
     DO_CAPTURE: "DO_CAPTURE",
     GET_ACTIVE_STATUS: "GET_ACTIVE_STATUS",
     PING: "PING",
+    READ_IMAGE_TEXT: "READ_IMAGE_TEXT",
+    RECOGNIZE_TEXT: "RECOGNIZE_TEXT",
     RUN_COMMAND: "RUN_COMMAND",
     START_PICKING: "START_PICKING",
   });
+
+  // Messages for the offscreen document carry this target, so the popup, the options page and
+  // the editor, which hear every runtime message too, leave them alone.
+  const OFFSCREEN_TARGET = "region-snap-ocr";
 
   const STATE = Object.freeze({
     DRAGGING: "dragging",
@@ -131,6 +137,7 @@
     IMAGE_FORMATS,
     MARK_COLOR_KEY,
     MESSAGE,
+    OFFSCREEN_TARGET,
     SETTINGS_KEY,
     STATE,
     WATCH_LIMITS,

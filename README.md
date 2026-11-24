@@ -48,7 +48,14 @@ flowchart TB
   the page's own text, so it is exact and instant, with no text recognition: lines in reading
   order, a blank line between paragraphs, and the values of text fields. Hidden text, password
   fields and text scrolled out of view are left out. Text drawn in images or canvases, and text
-  inside frames, is not read. With no text in the region the clipboard is left as it was.
+  inside frames, is not read: use **Text from image** for that. With no text in the region the
+  clipboard is left as it was.
+- **Text from image** recognises the text in the region's pixels, so it also reads pictures, video
+  frames, canvases and frames, and copies it: click the button, or press `Shift+T` on the `⠿`
+  handle. It works on an image opened in the editor too (the whole image is read). English and
+  Vietnamese are recognised offline with Tesseract, which ships inside the extension: nothing is
+  downloaded and the image never leaves the browser. Reading takes a few seconds, and marks drawn
+  on the region are left out. A Chrome version too old to run it says so instead.
 - Mark the locked region before capturing: the toolbar draws an **arrow** `↗`, a **box** `▢`, or
   **hides an area** `▒` behind a mosaic, and `↶` (or `Ctrl+Z` while a tool is held) removes the last
   mark. With a tool chosen a drag inside the region draws; `Esc` puts the tool down and the page is
@@ -152,7 +159,8 @@ After every source change, click **Reload** on the extension card before testing
 3. Use the round handles to resize; drag the `⠿` handle to move the region.
 4. Interact with the page as needed to reach the exact state you want to capture.
 5. Click **Capture**, press `Enter`, or use `Alt+Shift+C`. To take the text instead of an image,
-   click **Copy text** or press `T`.
+   click **Copy text** or press `T`; to read the text in a picture, video or canvas, click
+   **Text from image** or press `Shift+T`.
 6. Press `Esc` or the **×** button to close the overlay.
 
 For the whole page instead of a region, choose **Capture full page** in the popup or press
@@ -167,6 +175,8 @@ Keyboard shortcuts can be changed at `chrome://extensions/shortcuts`.
 
 - `activeTab`: access to the current tab only after a direct user action.
 - `scripting`: injects the region-selection UI into the active tab.
+- `offscreen`: opens a hidden extension page that runs the bundled text recognition while
+  **Text from image** reads a region, and closes it right after. It shows no install warning.
 - `storage`: keeps the settings (image format, corners, file name prefix, default action,
   capture delay, burst and capture-on-change counts) on this device. Nothing else is stored.
 

@@ -22,6 +22,12 @@ export default [
     },
   },
   {
+    files: ["ocr-offscreen.js"],
+    languageOptions: {
+      globals: { Tesseract: "readonly" },
+    },
+  },
+  {
     files: ["background.js"],
     languageOptions: {
       globals: globals.serviceworker,

@@ -22,7 +22,7 @@
         <img src="icons/icon128.png" alt="" />
         <div>
           <h1>Privacy Policy</h1>
-          <div class="meta">Region Snap · Last updated October 29, 2026</div>
+          <div class="meta">Region Snap · Last updated November 24, 2026</div>
         </div>
       </div>
 
@@ -49,6 +49,11 @@
           clipboard when the user chooses to copy it.
         </li>
         <li>
+          When the user picks Text from image, the text in the selected region is recognised inside
+          the browser by the text recognition that ships with the extension, and only the text is
+          placed on the clipboard. The image is not sent anywhere.
+        </li>
+        <li>
           Region Snap stores its preferences on the device (image format, rounded corners, file name
           prefix, default action, capture delay, burst and capture-on-change counts, and the last
           mark and highlighter colours). They never leave the device.
@@ -64,6 +69,10 @@
       <p>
         <code>scripting</code> injects the region-selection interface into the active tab only after
         an explicit user action.
+      </p>
+      <p>
+        <code>offscreen</code> opens a hidden extension page that runs the bundled text recognition
+        while Text from image reads a region, and closes it right after.
       </p>
       <p>
         <code>storage</code> keeps the preferences listed above in the browser's local extension

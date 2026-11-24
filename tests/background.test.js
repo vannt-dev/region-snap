@@ -9,14 +9,33 @@ function loadBackground({
   injected = false,
   contentState = "idle",
   contentRect = null,
+  offscreen = true,
+  openDocuments = 0,
+  recognize = async () => ({ text: "Hello", lineCount: 1 }),
 } = {}) {
   const calls = [];
   let contentReady = injected;
   let commandListener;
   let messageListener;
+  let documents = openDocuments;
   const tab = activeTab || { id: 7, windowId: 3, url: "https://example.com/" };
 
   const chrome = {
+    offscreen: offscreen
+      ? {
+          Reason: { WORKERS: "WORKERS" },
+          async createDocument(details) {
+            calls.push(["createDocument", details]);
+            if (documents) throw new Error("Only a single offscreen document may be created.");
+            documents += 1;
+          },
+          async closeDocument() {
+            calls.push(["closeDocument"]);
+            if (!documents) throw new Error("No current offscreen document.");
+            documents -= 1;
+          },
+        }
+      : undefined,
     i18n: {
       getMessage(key) {
         const messages = {
@@ -43,6 +62,14 @@ function loadBackground({
     runtime: {
       getManifest() {
         return { version: "1.0.0" };
+      },
+      getURL(file) {
+        return `chrome-extension://test/${file}`;
+      },
+      async sendMessage(message) {
+        calls.push(["runtimeSendMessage", message]);
+        assert.equal(documents, 1, "the offscreen document is open while text is read");
+        return recognize(message);
       },
       onMessage: {
         addListener(listener) {
@@ -234,4 +261,105 @@ test("popup status treats a supported uninjected tab as idle", async () => {
   assert.equal(response.supported, true);
   assert.equal(response.state, "idle");
   assert.equal(response.rect, null);
+});
+
+const PNG = "data:image/png;base64,iVBORw0KGgo=";
+
+test("text from an image is read in an offscreen document that closes afterwards", async () => {
+  const runtime = loadBackground();
+  const response = await sendRuntimeMessage(
+    runtime.getMessageListener(),
+    { type: "READ_IMAGE_TEXT", dataUrl: PNG },
+    { tab: runtime.tab },
+  );
+
+  assert.deepEqual({ ...response }, { text: "Hello", lineCount: 1 });
+  assert.deepEqual(
+    runtime.calls.map(([name]) => name),
+    ["createDocument", "runtimeSendMessage", "closeDocument"],
+  );
+  const [, details] = runtime.calls[0];
+  assert.equal(details.url, "ocr.html");
+  assert.deepEqual(Array.from(details.reasons), ["WORKERS"]);
+  const [, message] = runtime.calls[1];
+  assert.deepEqual(
+    { ...message },
+    { target: "region-snap-ocr", type: "RECOGNIZE_TEXT", dataUrl: PNG },
+  );
+});
+
+test("text reads take turns and share one offscreen document", async () => {
+  let active = 0;
+  let overlapped = false;
+  const runtime = loadBackground({
+    recognize: async (message) => {
+      active += 1;
+      overlapped ||= active > 1;
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      active -= 1;
+      return { text: message.dataUrl.slice(-1), lineCount: 1 };
+    },
+  });
+  const read = (dataUrl) =>
+    sendRuntimeMessage(
+      runtime.getMessageListener(),
+      { type: "READ_IMAGE_TEXT", dataUrl },
+      { tab: runtime.tab },
+    );
+
+  const responses = await Promise.all([read(`${PNG}1`), read(`${PNG}2`)]);
+  assert.deepEqual(
+    responses.map((response) => response.text),
+    ["1", "2"],
+  );
+  assert.equal(overlapped, false, "one recognition at a time");
+  assert.equal(runtime.calls.filter(([name]) => name === "closeDocument").length, 1);
+});
+
+test("a document left open by a restarted service worker is reused", async () => {
+  const runtime = loadBackground({ openDocuments: 1 });
+  const response = await sendRuntimeMessage(
+    runtime.getMessageListener(),
+    { type: "READ_IMAGE_TEXT", dataUrl: PNG },
+    { tab: runtime.tab },
+  );
+  assert.equal(response.text, "Hello");
+});
+
+test("recognition failures and old browsers come back as errors", async () => {
+  const failing = loadBackground({ recognize: async () => ({ error: "engine failed" }) });
+  const failed = await sendRuntimeMessage(
+    failing.getMessageListener(),
+    { type: "READ_IMAGE_TEXT", dataUrl: PNG },
+    { tab: failing.tab },
+  );
+  assert.deepEqual({ ...failed }, { error: "engine failed" });
+  assert.equal(failing.calls.at(-1)[0], "closeDocument");
+
+  const old = loadBackground({ offscreen: false });
+  const unsupported = await sendRuntimeMessage(
+    old.getMessageListener(),
+    { type: "READ_IMAGE_TEXT", dataUrl: PNG },
+    { tab: old.tab },
+  );
+  assert.deepEqual({ ...unsupported }, { error: "errorReadTextUnsupported" });
+
+  const notImage = loadBackground();
+  const refused = await sendRuntimeMessage(
+    notImage.getMessageListener(),
+    { type: "READ_IMAGE_TEXT", dataUrl: "javascript:alert(1)" },
+    { tab: notImage.tab },
+  );
+  assert.deepEqual({ ...refused }, { error: "errorReadText" });
+  assert.equal(notImage.calls.length, 0);
+});
+
+test("only content scripts may ask for text to be read", () => {
+  const runtime = loadBackground();
+  const keepAlive = runtime.getMessageListener()(
+    { type: "READ_IMAGE_TEXT", dataUrl: PNG },
+    {},
+    () => {},
+  );
+  assert.equal(keepAlive, false);
 });

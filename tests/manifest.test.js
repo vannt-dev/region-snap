@@ -10,7 +10,7 @@ test("manifest uses MV3 and on-demand injection", () => {
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.default_locale, "en");
   assert.equal(manifest.name, "__MSG_extensionName__");
-  assert.deepEqual(manifest.permissions.sort(), ["activeTab", "scripting", "storage"]);
+  assert.deepEqual(manifest.permissions.sort(), ["activeTab", "offscreen", "scripting", "storage"]);
   assert.equal(manifest.content_scripts, undefined);
 });
 
@@ -26,6 +26,9 @@ test("all extension entry files exist", () => {
     "annotations.js",
     "schedule.js",
     "content.js",
+    "ocr.html",
+    "ocr-offscreen.js",
+    "ocr-text.js",
     "overlay.css",
     "popup.js",
     "popup.css",
