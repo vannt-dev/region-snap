@@ -81,6 +81,8 @@
   // An image opened on the editor page instead of a live page: its element, the box it is
   // shown in and what to call when it is closed. Its region is the whole image.
   let imageSource = null;
+  // The panel that shows a decoded QR code, while it is open.
+  let qrPanel = null;
 
   let root;
   let dim;
@@ -126,8 +128,9 @@
   };
   // A press that travels less than this is a click on a note, not a drag of it.
   const CLICK_SLOP = 3;
-  // About the widest the toolbar gets: with a tool held it also shows the mark colours.
-  const TOOLBAR_WIDTH = 940;
+  // About the widest the toolbar gets: with a tool held it also shows the mark colours
+  // (measured at 1116 px in Chromium on Windows).
+  const TOOLBAR_WIDTH = 1120;
   // Capture on change waits for the region to be still this long, but never longer than the
   // second value after the first change, so content that never settles is still captured.
   const WATCH_QUIET_MS = 400;
@@ -202,6 +205,7 @@
       <button class="region-snap-copy" type="button">${t("overlayCopy")}</button>
       <button class="region-snap-copy-text" type="button" title="${t("overlayCopyTextTitle")}">${t("overlayCopyText")}</button>
       <button class="region-snap-read-text" type="button" title="${t("overlayReadTextTitle")}">${t("overlayReadText")}</button>
+      <button class="region-snap-read-qr" type="button" title="${t("overlayReadQrTitle")}">${t("overlayReadQr")}</button>
       <button class="region-snap-cancel" type="button" title="${t("overlayCancel")}" aria-label="${t("overlayCancel")}">×</button>
     `;
     gripButton = toolbar.querySelector(".region-snap-grip");
@@ -268,6 +272,9 @@
     toolbar.querySelector(".region-snap-read-text").addEventListener("click", (event) => {
       if (event.isTrusted) copyImageText();
     });
+    toolbar.querySelector(".region-snap-read-qr").addEventListener("click", (event) => {
+      if (event.isTrusted) readQrCode();
+    });
     toolbar.querySelector(".region-snap-cancel").addEventListener("click", (event) => {
       if (event.isTrusted) reset();
     });
@@ -306,7 +313,7 @@
     root?.remove();
     root = dim = border = toolbar = gripButton = sizeLabel = toast = null;
     markLayer = markSurface = markSvg = undoButton = textSizeButton = colorGroup = null;
-    burstButton = watchButton = runLabel = null;
+    burstButton = watchButton = runLabel = qrPanel = null;
     editor = null;
     textDrag = null;
     for (const position of Object.keys(handles)) delete handles[position];
@@ -1072,6 +1079,7 @@
       else if (stopCountdown) stopCountdown();
       else if (seriesRun) stopSeries("stopped");
       else if (activeTool) setTool(null);
+      else if (qrPanel) closeQrPanel();
       else reset();
       return;
     }
@@ -1107,6 +1115,21 @@
       event.stopImmediatePropagation();
       if (event.shiftKey) copyImageText();
       else copyRegionText();
+      return;
+    }
+    // Q reads a QR code in the region, from the grip like T.
+    if (
+      event.key.toLowerCase() === "q" &&
+      state === STATE.LOCKED &&
+      event.target === gripButton &&
+      !event.ctrlKey &&
+      !event.altKey &&
+      !event.metaKey &&
+      !event.shiftKey
+    ) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      readQrCode();
       return;
     }
     if (moveWithKeyboard(event)) event.preventDefault();
@@ -1573,6 +1596,32 @@
     });
   }
 
+  // The region's pixels as a plain PNG data URL, for reading text or a QR code from: square
+  // corners and no marks, which would be read as part of the picture. Null once the session
+  // has moved on.
+  async function plainRegionDataUrl(captureSession) {
+    const selectedRect = { ...rect };
+    const plain = { format: "png", roundedCorners: false };
+    let blob;
+    if (imageSource) {
+      blob = await imageToBlob(imageSource, plain, []);
+    } else {
+      root.dataset.capturing = "true";
+      await nextFrame();
+      await nextFrame();
+      if (captureSession !== sessionId) return null;
+      const response = await chrome.runtime.sendMessage({ type: MESSAGE.CAPTURE_TAB });
+      if (captureSession !== sessionId) return null;
+      root.dataset.capturing = "false";
+      if (!response || response.error) {
+        throw new Error(response?.error || t("overlayCaptureMissing"));
+      }
+      blob = await cropToBlob(response.dataUrl, selectedRect, plain, []);
+    }
+    const dataUrl = await blobToDataUrl(blob);
+    return captureSession === sessionId ? dataUrl : null;
+  }
+
   // Reads the text in the region's pixels (a picture, a video frame, a canvas) with the OCR
   // that ships inside the extension, and copies it. The marks are left out, or they would be
   // read as text; like "Copy text", nothing is copied when no text is found.
@@ -1585,27 +1634,9 @@
 
     capturing = true;
     const captureSession = sessionId;
-    const selectedRect = { ...rect };
-    const plain = { format: "png", roundedCorners: false };
     try {
-      let blob;
-      if (imageSource) {
-        blob = await imageToBlob(imageSource, plain, []);
-      } else {
-        root.dataset.capturing = "true";
-        await nextFrame();
-        await nextFrame();
-        if (captureSession !== sessionId) return false;
-        const response = await chrome.runtime.sendMessage({ type: MESSAGE.CAPTURE_TAB });
-        if (captureSession !== sessionId) return false;
-        root.dataset.capturing = "false";
-        if (!response || response.error) {
-          throw new Error(response?.error || t("overlayCaptureMissing"));
-        }
-        blob = await cropToBlob(response.dataUrl, selectedRect, plain, []);
-      }
-      const dataUrl = await blobToDataUrl(blob);
-      if (captureSession !== sessionId) return false;
+      const dataUrl = await plainRegionDataUrl(captureSession);
+      if (!dataUrl) return false;
       showToast(t("overlayReadingText"), "info", { lasting: true });
       const result = await chrome.runtime.sendMessage({ type: MESSAGE.READ_IMAGE_TEXT, dataUrl });
       if (captureSession !== sessionId) return false;
@@ -1636,6 +1667,210 @@
       return false;
     } finally {
       if (captureSession === sessionId) capturing = false;
+    }
+  }
+
+  function closeQrPanel() {
+    qrPanel?.remove();
+    qrPanel = null;
+  }
+
+  // Shows what a QR code holds. The text comes from the picture, so it is set as plain text and
+  // never as markup. A web address is shown whole, as the browser will open it, with its host
+  // set apart, and is opened only by a click on "Open link".
+  function showQrPanel({ text, link }) {
+    closeQrPanel();
+    const panel = document.createElement("div");
+    panel.className = "region-snap-qr";
+    panel.setAttribute("role", "dialog");
+    panel.setAttribute("aria-label", t("overlayQrTitle"));
+
+    const head = document.createElement("div");
+    head.className = "region-snap-qr-head";
+    const title = document.createElement("strong");
+    title.textContent = t("overlayQrTitle");
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "region-snap-qr-close";
+    close.title = t("overlayQrClose");
+    close.setAttribute("aria-label", t("overlayQrClose"));
+    close.textContent = "×";
+    head.append(title, close);
+    panel.appendChild(head);
+
+    if (link) {
+      const host = document.createElement("p");
+      host.className = "region-snap-qr-host";
+      const name = document.createElement("b");
+      name.textContent = link.host;
+      host.append(`${t("overlayQrOpensOn")} `, name);
+      panel.appendChild(host);
+    }
+    const body = document.createElement("p");
+    body.className = "region-snap-qr-text";
+    body.textContent = link ? link.href : text;
+    panel.appendChild(body);
+
+    const actions = document.createElement("div");
+    actions.className = "region-snap-qr-actions";
+    const copy = document.createElement("button");
+    copy.type = "button";
+    copy.className = "region-snap-qr-copy";
+    copy.textContent = t("overlayCopy");
+    actions.appendChild(copy);
+    let open = null;
+    if (link) {
+      open = document.createElement("button");
+      open.type = "button";
+      open.className = "region-snap-qr-open";
+      open.textContent = t("overlayQrOpen");
+      actions.appendChild(open);
+    }
+    panel.appendChild(actions);
+
+    close.addEventListener("click", (event) => {
+      if (event.isTrusted) closeQrPanel();
+    });
+    copy.addEventListener("click", async (event) => {
+      if (!event.isTrusted) return;
+      if (await writeClipboardText(text)) showToast(t("overlayQrCopied"), "success");
+      else if (root) showToast(t("overlayCopyTextFailed"), "error");
+    });
+    open?.addEventListener("click", async (event) => {
+      if (!event.isTrusted) return;
+      try {
+        const response = await chrome.runtime.sendMessage({
+          type: MESSAGE.OPEN_QR_LINK,
+          url: link.href,
+        });
+        if (!response?.ok) throw new Error(response?.error || t("errorOpenQrLink"));
+      } catch (error) {
+        showToast(error?.message || t("errorOpenQrLink"), "error");
+      }
+    });
+
+    root.appendChild(panel);
+    qrPanel = panel;
+    copy.focus({ preventScroll: true });
+  }
+
+  // Reads a QR code in the region's pixels with the jsQR decoder that ships inside the
+  // extension; the picture never leaves the browser. Nothing is copied or opened by itself.
+  async function readQrCode() {
+    if (state !== STATE.LOCKED || !rect) {
+      showToast(t("overlaySelectFirst"), "error");
+      return false;
+    }
+    if (capturing) return false;
+
+    capturing = true;
+    const captureSession = sessionId;
+    closeQrPanel();
+    try {
+      const dataUrl = await plainRegionDataUrl(captureSession);
+      if (!dataUrl) return false;
+      const result = await chrome.runtime.sendMessage({ type: MESSAGE.READ_QR_CODE, dataUrl });
+      if (captureSession !== sessionId) return false;
+      if (!result || result.error) throw new Error(result?.error || t("errorReadQr"));
+      if (!result.found) {
+        showToast(t("overlayNoQrFound"), "error");
+        return false;
+      }
+      showQrPanel({ text: String(result.text ?? ""), link: result.link || null });
+      return true;
+    } catch (error) {
+      if (root && captureSession === sessionId) {
+        root.dataset.capturing = "false";
+        showToast(error?.message || t("errorReadQr"), "error");
+      }
+      console.error("Region Snap QR code reading failed:", error);
+      return false;
+    } finally {
+      if (captureSession === sessionId) capturing = false;
+    }
+  }
+
+  // The service worker keeps the region of the last capture, for "Recapture last region".
+  function rememberCapturedRegion(selectedRect, scroll) {
+    Promise.resolve(
+      chrome.runtime.sendMessage({
+        type: MESSAGE.REMEMBER_REGION,
+        region: { rect: selectedRect, scroll },
+      }),
+    ).catch(() => {});
+  }
+
+  // Captures the region this tab last captured again, with no selecting: the same part of the
+  // page, found where it sits on the page. If the window does not show all of it, the page is
+  // scrolled back to where it was for the shot and then put back. The settings apply as for any
+  // capture, without the delay; the marks of that capture are not kept.
+  async function recaptureRegion(region) {
+    if (capturing) return false;
+    if (state === STATE.IDLE) sessionId += 1;
+    else reset();
+
+    capturing = true;
+    const captureSession = sessionId;
+    const scrollStart = { left: window.scrollX, top: window.scrollY };
+    let scrolled = false;
+    const scrollBack = () => {
+      if (!scrolled) return;
+      scrolled = false;
+      window.scrollTo({ ...scrollStart, behavior: "instant" });
+    };
+    injectOverlay();
+    root.dataset.capturing = "true";
+    try {
+      if (!region) throw new Error(t("overlayNoLastRegion"));
+      const stored = await loadSettings();
+      if (captureSession !== sessionId) return false;
+      let selectedRect = Geometry.regionInView(region, scrollStart, viewportBounds());
+      if (!selectedRect) {
+        scrolled = true;
+        window.scrollTo({ left: region.scrollLeft, top: region.scrollTop, behavior: "instant" });
+        selectedRect = Geometry.regionInView(
+          region,
+          { left: window.scrollX, top: window.scrollY },
+          viewportBounds(),
+        );
+        if (!selectedRect) throw new Error(t("overlayLastRegionGone"));
+      }
+      await nextFrame();
+      await nextFrame();
+      if (captureSession !== sessionId) return false;
+      const copy = stored.defaultAction === "copy";
+      // The clipboard only takes PNG, so a copy ignores the chosen file format.
+      const settings = copy ? { ...stored, format: "png" } : stored;
+      const response = await chrome.runtime.sendMessage({ type: MESSAGE.CAPTURE_TAB });
+      scrollBack();
+      if (!response || response.error) {
+        throw new Error(response?.error || t("overlayCaptureMissing"));
+      }
+      if (captureSession !== sessionId) return false;
+      const blob = await cropToBlob(response.dataUrl, selectedRect, settings, []);
+      if (captureSession !== sessionId) return false;
+      const outcome = await deliver(blob, settings, copy);
+      if (root && captureSession === sessionId) {
+        root.dataset.capturing = "false";
+        showToast(t(DELIVERY_MESSAGES[outcome]), "success");
+      }
+      return true;
+    } catch (error) {
+      if (root && captureSession === sessionId) {
+        root.dataset.capturing = "false";
+        showToast(error?.message || t("overlayCaptureError"), "error");
+      }
+      console.error("Region Snap recapture failed:", error);
+      return false;
+    } finally {
+      scrollBack();
+      if (captureSession === sessionId) {
+        capturing = false;
+        // Leave the toast up for as long as it shows, then take the empty overlay away.
+        window.setTimeout(() => {
+          if (captureSession === sessionId) closeIdleOverlay();
+        }, 3000);
+      }
     }
   }
 
@@ -1670,6 +1905,8 @@
       const copy = (action || stored.defaultAction) === "copy";
       // The clipboard only takes PNG, so a copy ignores the chosen file format.
       const settings = copy ? { ...stored, format: "png" } : stored;
+      // Where the page was scrolled for the shot; an opened image has no page to come back to.
+      let captureScroll = null;
       let blob;
       if (imageSource) {
         blob = await imageToBlob(imageSource, settings, selectedMarks);
@@ -1678,6 +1915,7 @@
         await nextFrame();
         await nextFrame();
         if (captureSession !== sessionId) return false;
+        captureScroll = { left: window.scrollX, top: window.scrollY };
         const response = await chrome.runtime.sendMessage({ type: MESSAGE.CAPTURE_TAB });
         if (!response || response.error) {
           throw new Error(response?.error || t("overlayCaptureMissing"));
@@ -1687,6 +1925,7 @@
       }
       if (captureSession !== sessionId) return false;
       const outcome = await deliver(blob, settings, copy);
+      if (captureScroll) rememberCapturedRegion(selectedRect, captureScroll);
       if (root && captureSession === sessionId) {
         root.dataset.capturing = "false";
         showToast(t(DELIVERY_MESSAGES[outcome]), "success");
@@ -2448,6 +2687,11 @@
     }
     if (message?.type === MESSAGE.CAPTURE_FULL_PAGE) {
       captureFullPage();
+      sendResponse({ ok: true, state });
+      return false;
+    }
+    if (message?.type === MESSAGE.RECAPTURE_REGION) {
+      recaptureRegion(message.region || null);
       sendResponse({ ok: true, state });
       return false;
     }

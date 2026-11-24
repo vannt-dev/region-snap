@@ -12,7 +12,12 @@ framework or bundler, which keeps the Store package auditable. Most of the packa
   goes through `normalizeSettings`.
 - `background.js` owns Chrome-only operations: active-tab validation, on-demand injection, command
   routing, visible-tab capture, and the offscreen document for text from an image: it opens
-  `ocr.html` when a read starts, lets reads take turns, and closes it after the last one.
+  `ocr.html` when a read starts, lets reads take turns, and closes it after the last one. It also
+  decodes QR codes itself, with jsQR copied into `vendor/jsqr/` by the build, on an
+  `OffscreenCanvas`, and opens a decoded link only after checking it is `http` or `https` again.
+  The last region each tab captured is kept in `chrome.storage.session` for the recapture command.
+- `qr-code.js` holds the QR helpers the worker uses: the decoding call, the downscaling of huge
+  regions, and which decoded text counts as a link and how its host is shown.
 - `ocr-offscreen.js` runs in that offscreen document and reads a region's PNG with Tesseract.
   The worker, the WebAssembly cores and the English and Vietnamese models are copied from
   `node_modules` into `vendor/tesseract/` by the build (`VENDOR_FILES` in

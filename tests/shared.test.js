@@ -10,6 +10,7 @@ test("shared communication contract is immutable and internally consistent", () 
   assert.deepEqual(Object.values(shared.COMMAND_TO_MESSAGE).sort(), [
     shared.MESSAGE.CAPTURE_FULL_PAGE,
     shared.MESSAGE.DO_CAPTURE,
+    shared.MESSAGE.RECAPTURE_REGION,
     shared.MESSAGE.START_PICKING,
   ]);
   assert.equal(new Set(shared.ALLOWED_PROTOCOLS).size, shared.ALLOWED_PROTOCOLS.length);

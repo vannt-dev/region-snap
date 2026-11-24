@@ -12,11 +12,14 @@ function loadBackground({
   offscreen = true,
   openDocuments = 0,
   recognize = async () => ({ text: "Hello", lineCount: 1 }),
+  pixels = null,
+  session = {},
 } = {}) {
   const calls = [];
   let contentReady = injected;
   let commandListener;
   let messageListener;
+  let removedListener;
   let documents = openDocuments;
   const tab = activeTab || { id: 7, windowId: 3, url: "https://example.com/" };
 
@@ -89,7 +92,32 @@ function loadBackground({
         contentReady = true;
       },
     },
+    storage: {
+      session: {
+        async get(key) {
+          calls.push(["sessionGet", key]);
+          return key in session ? { [key]: session[key] } : {};
+        },
+        async set(items) {
+          calls.push(["sessionSet", items]);
+          Object.assign(session, items);
+        },
+        async remove(key) {
+          calls.push(["sessionRemove", key]);
+          delete session[key];
+        },
+      },
+    },
     tabs: {
+      onRemoved: {
+        addListener(listener) {
+          removedListener = listener;
+        },
+      },
+      async create(details) {
+        calls.push(["createTab", details]);
+        return { id: 99 };
+      },
       async query() {
         return [tab];
       },
@@ -108,19 +136,59 @@ function loadBackground({
     },
   };
 
-  const sharedSource = fs.readFileSync(path.resolve(__dirname, "../shared.js"), "utf8");
-  const source = fs.readFileSync(path.resolve(__dirname, "../background.js"), "utf8");
-  const context = { chrome, console, URL, Set };
+  const read = (file) => fs.readFileSync(path.resolve(__dirname, "..", file), "utf8");
+  // The worker imports jsQR from its build-time copy; the tests read it from node_modules.
+  const IMPORTS = {
+    "shared.js": "shared.js",
+    "geometry.js": "geometry.js",
+    "qr-code.js": "qr-code.js",
+    "vendor/jsqr/jsQR.js": "node_modules/jsqr/dist/jsQR.js",
+  };
+  const source = read("background.js");
+  // What the canvas holds once a region is drawn on it for a QR code read.
+  const imagePixels = pixels || {
+    data: new Uint8ClampedArray(16 * 16 * 4).fill(255),
+    width: 16,
+    height: 16,
+  };
+  const context = {
+    chrome,
+    console,
+    URL,
+    Set,
+    async fetch(url) {
+      calls.push(["fetch", url]);
+      return { blob: async () => ({ size: 1 }) };
+    },
+    async createImageBitmap() {
+      return { width: imagePixels.width, height: imagePixels.height, close() {} };
+    },
+    OffscreenCanvas: class {
+      constructor(width, height) {
+        calls.push(["OffscreenCanvas", width, height]);
+      }
+      getContext() {
+        return {
+          fillRect() {},
+          drawImage() {},
+          getImageData: () => imagePixels,
+        };
+      }
+    },
+  };
   context.globalThis = context;
-  context.importScripts = (file) => {
-    assert.equal(file, "shared.js");
-    vm.runInNewContext(sharedSource, context);
+  context.self = context;
+  context.importScripts = (...files) => {
+    assert.deepEqual(files, Object.keys(IMPORTS));
+    for (const file of files) vm.runInNewContext(read(IMPORTS[file]), context);
   };
   vm.runInNewContext(source, context);
   return {
     calls,
     getCommandListener: () => commandListener,
     getMessageListener: () => messageListener,
+    getRemovedListener: () => removedListener,
+    session,
     tab,
   };
 }
@@ -362,4 +430,156 @@ test("only content scripts may ask for text to be read", () => {
     () => {},
   );
   assert.equal(keepAlive, false);
+});
+
+// Draws a QR code as RGBA pixels, four pixels a module, with a quiet zone around it.
+function qrPixels(text) {
+  const { modules } = require("qrcode").create(text, { errorCorrectionLevel: "M" });
+  const scale = 4;
+  const margin = 4;
+  const size = (modules.size + margin * 2) * scale;
+  const data = new Uint8ClampedArray(size * size * 4).fill(255);
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const row = Math.floor(y / scale) - margin;
+      const column = Math.floor(x / scale) - margin;
+      if (row < 0 || column < 0 || row >= modules.size || column >= modules.size) continue;
+      if (modules.get(row, column) !== 1) continue;
+      const offset = (y * size + x) * 4;
+      data[offset] = data[offset + 1] = data[offset + 2] = 0;
+    }
+  }
+  return { data, width: size, height: size };
+}
+
+test("a QR code is read in the worker with the bundled decoder", async () => {
+  const runtime = loadBackground({ pixels: qrPixels("https://example.com/menu") });
+  const response = await sendRuntimeMessage(
+    runtime.getMessageListener(),
+    { type: "READ_QR_CODE", dataUrl: PNG },
+    { tab: runtime.tab },
+  );
+  assert.deepEqual(JSON.parse(JSON.stringify(response)), {
+    found: true,
+    text: "https://example.com/menu",
+    link: { href: "https://example.com/menu", host: "example.com" },
+  });
+  assert.deepEqual(
+    runtime.calls.map(([name]) => name),
+    ["fetch", "OffscreenCanvas"],
+    "no offscreen document and no network: only the data URL is read",
+  );
+
+  const text = loadBackground({ pixels: qrPixels("javascript:alert(1)") });
+  const plain = await sendRuntimeMessage(
+    text.getMessageListener(),
+    { type: "READ_QR_CODE", dataUrl: PNG },
+    { tab: text.tab },
+  );
+  assert.equal(plain.text, "javascript:alert(1)");
+  assert.equal(plain.link, null, "only http and https are offered as links");
+});
+
+test("a region with no QR code, or no image, says so", async () => {
+  const blank = loadBackground();
+  const none = await sendRuntimeMessage(
+    blank.getMessageListener(),
+    { type: "READ_QR_CODE", dataUrl: PNG },
+    { tab: blank.tab },
+  );
+  assert.deepEqual({ ...none }, { found: false });
+
+  const refused = await sendRuntimeMessage(
+    blank.getMessageListener(),
+    { type: "READ_QR_CODE", dataUrl: "https://example.com/x.png" },
+    { tab: blank.tab },
+  );
+  assert.deepEqual({ ...refused }, { error: "errorReadQr" });
+  assert.equal(
+    blank.getMessageListener()({ type: "READ_QR_CODE", dataUrl: PNG }, {}, () => {}),
+    false,
+    "only content scripts may ask",
+  );
+});
+
+test("a QR link opens in a new tab next to its own, and only an http or https one", async () => {
+  const runtime = loadBackground();
+  const sender = { tab: { id: 7, index: 2, windowId: 3 } };
+  const opened = await sendRuntimeMessage(
+    runtime.getMessageListener(),
+    { type: "OPEN_QR_LINK", url: "https://example.com/a" },
+    sender,
+  );
+  assert.equal(opened.ok, true);
+  const created = runtime.calls.find(([name]) => name === "createTab")[1];
+  assert.deepEqual(
+    { ...created },
+    { url: "https://example.com/a", openerTabId: 7, index: 3, windowId: 3 },
+  );
+
+  for (const url of ["javascript:alert(1)", "file:///C:/", "chrome://settings", 42]) {
+    const refused = await sendRuntimeMessage(
+      runtime.getMessageListener(),
+      { type: "OPEN_QR_LINK", url },
+      sender,
+    );
+    assert.equal(refused.ok, false, String(url));
+  }
+  assert.equal(runtime.calls.filter(([name]) => name === "createTab").length, 1);
+});
+
+test("the last captured region is kept per tab and sent back for a recapture", async () => {
+  const runtime = loadBackground({ injected: true });
+  const remembered = await sendRuntimeMessage(
+    runtime.getMessageListener(),
+    {
+      type: "REMEMBER_REGION",
+      region: {
+        rect: { left: 10, top: 20, width: 300, height: 200 },
+        scroll: { left: 0, top: 500 },
+      },
+    },
+    { tab: runtime.tab },
+  );
+  assert.equal(remembered.ok, true);
+  assert.deepEqual(
+    { ...runtime.session["lastRegion:7"] },
+    { left: 10, top: 520, width: 300, height: 200, scrollLeft: 0, scrollTop: 500 },
+  );
+
+  const status = await sendRuntimeMessage(runtime.getMessageListener(), {
+    type: "GET_ACTIVE_STATUS",
+  });
+  assert.equal(status.hasLastRegion, true);
+
+  await runtime.getCommandListener()("recapture-region", runtime.tab);
+  const sent = runtime.calls.filter(([name]) => name === "sendMessage").at(-1);
+  assert.equal(sent[2].type, "RECAPTURE_REGION");
+  assert.deepEqual({ ...sent[2].region }, { ...runtime.session["lastRegion:7"] });
+
+  runtime.getRemovedListener()(7);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(runtime.session["lastRegion:7"], undefined, "closing the tab forgets it");
+});
+
+test("a recapture with nothing remembered still reaches the page, which says so", async () => {
+  const runtime = loadBackground();
+  const response = await sendRuntimeMessage(runtime.getMessageListener(), {
+    type: "RUN_COMMAND",
+    command: "RECAPTURE_REGION",
+  });
+  assert.equal(response.ok, true);
+  assert.deepEqual(
+    runtime.calls.map((call) => call[0]),
+    ["sendMessage", "insertCSS", "executeScript", "sessionGet", "sendMessage"],
+  );
+  assert.equal(runtime.calls.at(-1)[2].region, null);
+
+  const bad = await sendRuntimeMessage(
+    runtime.getMessageListener(),
+    { type: "REMEMBER_REGION", region: { rect: { left: 0, top: 0, width: 0, height: 5 } } },
+    { tab: runtime.tab },
+  );
+  assert.equal(bad.ok, false);
+  assert.deepEqual(runtime.session, {});
 });

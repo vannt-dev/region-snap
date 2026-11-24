@@ -54,6 +54,17 @@
           placed on the clipboard. The image is not sent anywhere.
         </li>
         <li>
+          When the user picks QR code, the code in the selected region is decoded inside the browser
+          by the decoder that ships with the extension. Its text is only shown to the user; it is
+          copied, or a web address opened in a new tab, only when the user clicks to do so.
+        </li>
+        <li>
+          To capture the last region again, Region Snap keeps, for each tab, the position and size
+          of the last region captured there in the browser's session storage, which is held in
+          memory and cleared when the browser closes. No page address, page content or image is kept
+          with it.
+        </li>
+        <li>
           Region Snap stores its preferences on the device (image format, rounded corners, file name
           prefix, default action, capture delay, burst and capture-on-change counts, and the last
           mark and highlighter colours). They never leave the device.
@@ -76,7 +87,7 @@
       </p>
       <p>
         <code>storage</code> keeps the preferences listed above in the browser's local extension
-        storage.
+        storage, and the last captured region of each tab in its session storage.
       </p>
 
       <h2>Remote services</h2>

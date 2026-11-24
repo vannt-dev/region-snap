@@ -260,6 +260,44 @@
     return tidyLines(output.join("\n"));
   }
 
+  // A region is remembered for "Recapture last region" where it sits on the page, not in the
+  // window: its viewport box moved by how far the page was scrolled, and that scroll position,
+  // so the same part of the page is found again after the page has scrolled. Bad input is null.
+  function rememberRegion(rect, scroll) {
+    const value = {
+      left: Number(rect?.left) + Number(scroll?.left),
+      top: Number(rect?.top) + Number(scroll?.top),
+      width: Number(rect?.width),
+      height: Number(rect?.height),
+      scrollLeft: Number(scroll?.left),
+      scrollTop: Number(scroll?.top),
+    };
+    if (!Object.values(value).every(Number.isFinite)) return null;
+    if (value.width < 1 || value.height < 1) return null;
+    return value;
+  }
+
+  // The remembered region's box in the window at a scroll position, or null when the window
+  // does not show all of it there: a part of the region is never captured as if it were all.
+  function regionInView(region, scroll, viewport, slack = 0.5) {
+    const values = [region?.left, region?.top, region?.width, region?.height];
+    if (!values.every(Number.isFinite) || !(region.width >= 1) || !(region.height >= 1)) {
+      return null;
+    }
+    const rect = {
+      left: region.left - scroll.left,
+      top: region.top - scroll.top,
+      width: region.width,
+      height: region.height,
+    };
+    const inside =
+      rect.left >= -slack &&
+      rect.top >= -slack &&
+      rect.left + rect.width <= viewport.width + slack &&
+      rect.top + rect.height <= viewport.height + slack;
+    return inside ? fitRectToBounds(rect, viewport) : null;
+  }
+
   const api = Object.freeze({
     CANVAS_LIMITS,
     boxCenterInRect,
@@ -273,7 +311,9 @@
     planFullPage,
     planScrollCapture,
     rectFromPoints,
+    regionInView,
     regionText,
+    rememberRegion,
     resizeRect,
     scrollSlice,
   });

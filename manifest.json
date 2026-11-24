@@ -19,6 +19,10 @@
     "capture-full-page": {
       "suggested_key": { "default": "Alt+Shift+F" },
       "description": "__MSG_commandFullPage__"
+    },
+    "recapture-region": {
+      "suggested_key": { "default": "Alt+Shift+L" },
+      "description": "__MSG_commandRecapture__"
     }
   },
   "content_security_policy": {

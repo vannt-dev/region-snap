@@ -4,6 +4,7 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { chromium } from "playwright";
+import QRCode from "qrcode";
 import { DIST_DIR, ROOT } from "./project-config.mjs";
 
 const profile = await fs.mkdtemp(path.join(os.tmpdir(), "region-snap-smoke-"));
@@ -93,6 +94,16 @@ try {
               return new Promise((resolve) => {
                 globalThis.__readTextRequest = { dataUrl: message.dataUrl, resolve };
               });
+            }
+            // Handed to the real service worker by the test (relayWorkerRequest below).
+            if (message.type === "READ_QR_CODE" || message.type === "OPEN_QR_LINK") {
+              return new Promise((resolve) => {
+                globalThis.__workerRequest = { message, resolve };
+              });
+            }
+            if (message.type === "REMEMBER_REGION") {
+              (globalThis.__rememberedRegions ||= []).push(message.region);
+              return { ok: true };
             }
             if (message.type !== "CAPTURE_TAB") return { ok: true };
             if (globalThis.__delayCapture) {
@@ -1233,6 +1244,247 @@ try {
   assert.equal(secondRead.response.text, firstRead.response.text);
   await targetPage.keyboard.press("Escape");
   await targetPage.locator("#region-snap-root").waitFor({ state: "detached" });
+
+  // QR code: the region's pixels go to the real service worker, which decodes them with the
+  // bundled jsQR. The text is shown as plain text; a web address shows its host and opens in a
+  // new tab only on a click, through the worker again.
+  async function relayWorkerRequest() {
+    let request = null;
+    for (let tries = 0; !request && tries < 200; tries += 1) {
+      const { result } = await evaluateIsolated(
+        "JSON.stringify(globalThis.__workerRequest?.message || null)",
+      );
+      request = JSON.parse(result.value);
+      if (!request) await targetPage.waitForTimeout(25);
+    }
+    assert.ok(request, "the page asks the service worker");
+    const response = await relay.evaluate(
+      (message) => globalThis.chrome.runtime.sendMessage(message),
+      request,
+    );
+    await evaluateIsolated(
+      `globalThis.__workerRequest.resolve(${JSON.stringify(response)});
+       globalThis.__workerRequest = null;`,
+    );
+    return { request, response };
+  }
+  async function showPicture(src) {
+    await targetPage.evaluate((source) => {
+      const { document } = globalThis;
+      document.body.style.cssText = "margin: 0; padding: 0; background: #fff";
+      document.body.innerHTML = `<img id="qr-picture" alt="" src="${source}"
+      style="position: absolute; left: 40px; top: 40px">`;
+      globalThis.scrollTo(0, 0);
+      return document.getElementById("qr-picture").decode();
+    }, src);
+    const shot = await targetPage.screenshot();
+    await evaluateIsolated(
+      `globalThis.__captureDataUrl = ${JSON.stringify(`data:image/png;base64,${shot.toString("base64")}`)}`,
+    );
+    return targetPage.locator("#qr-picture").boundingBox();
+  }
+  const qrLink = `http://127.0.0.1:${port}/from-qr?menu=1`;
+  const linkBox = await showPicture(await QRCode.toDataURL(qrLink, { margin: 4, scale: 5 }));
+  const aroundPicture = (box) => [
+    { x: box.x - 10, y: box.y - 10 },
+    { x: box.x + box.width + 10, y: box.y + box.height + 10 },
+  ];
+  const downloadsBeforeQr = downloadCount;
+  await setClipboard("before");
+  await selectArea(...aroundPicture(linkBox));
+  await targetPage.locator(".region-snap-read-qr").click();
+  const linkRead = await relayWorkerRequest();
+  assert.equal(linkRead.request.type, "READ_QR_CODE");
+  assert.ok(linkRead.request.dataUrl.startsWith("data:image/png;base64,"));
+  assert.equal(linkRead.response.text, qrLink);
+  const qrPanel = targetPage.locator(".region-snap-qr");
+  await qrPanel.waitFor();
+  assert.equal(await qrPanel.locator(".region-snap-qr-host b").textContent(), `127.0.0.1:${port}`);
+  assert.equal(await qrPanel.locator(".region-snap-qr-text").textContent(), qrLink);
+  assert.equal(await readClipboard(), "before", "reading a code copies nothing by itself");
+  assert.equal(downloadCount, downloadsBeforeQr, "reading a code saves no image");
+  await qrPanel.locator(".region-snap-qr-copy").click();
+  await targetPage.locator(".region-snap-toast", { hasText: "overlayQrCopied" }).waitFor();
+  assert.equal(await readClipboard(), qrLink);
+  const openedPromise = context.waitForEvent("page");
+  await qrPanel.locator(".region-snap-qr-open").click();
+  const openRequest = await relayWorkerRequest();
+  assert.deepEqual(openRequest.request, { type: "OPEN_QR_LINK", url: qrLink });
+  assert.equal(openRequest.response.ok, true);
+  const opened = await openedPromise;
+  await opened.waitForLoadState();
+  assert.equal(opened.url(), qrLink, "the link opens in a new tab");
+  await opened.close();
+  // Esc closes the panel first and keeps the region.
+  await targetPage.keyboard.press("Escape");
+  await qrPanel.waitFor({ state: "detached" });
+  assert.equal(await root.getAttribute("data-mode"), "locked");
+  await targetPage.keyboard.press("Escape");
+  await targetPage.locator("#region-snap-root").waitFor({ state: "detached" });
+
+  // Q on the grip reads a code too. Text that is not a web address, here a script address
+  // holding markup, is shown as text with no Open button and nothing of it runs.
+  const scriptText = "javascript:alert('<img src=x onerror=alert(1)>')";
+  const textBox = await showPicture(await QRCode.toDataURL(scriptText, { margin: 4, scale: 5 }));
+  await selectArea(...aroundPicture(textBox));
+  await targetPage.locator(".region-snap-grip").focus();
+  await targetPage.keyboard.press("q");
+  await relayWorkerRequest();
+  await qrPanel.waitFor();
+  assert.equal(await qrPanel.locator(".region-snap-qr-text").textContent(), scriptText);
+  assert.equal(await qrPanel.locator(".region-snap-qr-open").count(), 0);
+  assert.equal(await qrPanel.locator(".region-snap-qr-host").count(), 0);
+  assert.equal(await qrPanel.locator("img").count(), 0, "decoded text is never markup");
+  await qrPanel.locator(".region-snap-qr-close").click();
+  await qrPanel.waitFor({ state: "detached" });
+
+  // A region with no code says so.
+  await selectArea({ x: 600, y: 400 }, { x: 760, y: 520 });
+  await targetPage.locator(".region-snap-read-qr").click();
+  const blankRead = await relayWorkerRequest();
+  assert.equal(blankRead.response.found, false);
+  await targetPage.locator(".region-snap-toast", { hasText: "overlayNoQrFound" }).waitFor();
+  assert.equal(await qrPanel.count(), 0);
+  await targetPage.keyboard.press("Escape");
+  await targetPage.locator("#region-snap-root").waitFor({ state: "detached" });
+  await evaluateIsolated("globalThis.__captureDataUrl = null");
+
+  // Recapture last region: a capture is remembered where it sits on the page, kept by the real
+  // service worker, and taken again after the page has scrolled, with no selecting. The fake
+  // screenshot draws one black box at a fixed place on the page, wherever the page is scrolled.
+  const commands = await relay.evaluate(() => globalThis.chrome.commands.getAll());
+  assert.equal(
+    commands.find((command) => command.name === "recapture-region")?.shortcut,
+    "Alt+Shift+L",
+    "Chrome gives the recapture command its suggested shortcut",
+  );
+  await storeSettings({ defaultAction: "download", format: "png", roundedCorners: false });
+  await targetPage.evaluate(() => {
+    const { document } = globalThis;
+    document.body.style.cssText = "margin: 0; padding: 0; background: #fff";
+    document.body.innerHTML = '<div style="height: 3000px"></div>';
+    globalThis.scrollTo(0, 1000);
+  });
+  await evaluateIsolated(`
+    globalThis.__captureScrolls = [];
+    globalThis.__rememberedRegions = [];
+    globalThis.__captureFactory = () => {
+      const canvas = globalThis.document.createElement("canvas");
+      canvas.width = globalThis.innerWidth;
+      canvas.height = globalThis.innerHeight;
+      const context = canvas.getContext("2d");
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.fillStyle = "#000000";
+      context.fillRect(100 - globalThis.scrollX, 1200 - globalThis.scrollY, 200, 150);
+      globalThis.__captureScrolls.push(globalThis.scrollY);
+      return canvas.toDataURL("image/png");
+    };
+  `);
+  // Counts the pixels of a saved PNG that are not black.
+  const blackness = async (download) => {
+    const base64 = (await fs.readFile(await download.path())).toString("base64");
+    return targetPage.evaluate(async (data) => {
+      const blob = await (await globalThis.fetch(`data:image/png;base64,${data}`)).blob();
+      const bitmap = await globalThis.createImageBitmap(blob);
+      const canvas = globalThis.document.createElement("canvas");
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      const context = canvas.getContext("2d");
+      context.drawImage(bitmap, 0, 0);
+      const { data: pixels } = context.getImageData(0, 0, bitmap.width, bitmap.height);
+      let light = 0;
+      for (let index = 0; index < pixels.length; index += 4) {
+        if (pixels[index] > 40 || pixels[index + 1] > 40 || pixels[index + 2] > 40) light += 1;
+      }
+      return { width: bitmap.width, height: bitmap.height, light };
+    }, base64);
+  };
+  const scrollTop = () => targetPage.evaluate(() => globalThis.scrollY);
+  const recapture = (region) =>
+    evaluateIsolated(
+      `new Promise((resolve) =>
+        globalThis.__regionSnapListener(
+          { type: "RECAPTURE_REGION", region: ${JSON.stringify(region)} }, {}, resolve)
+      )`,
+      true,
+    );
+
+  await selectArea({ x: 100, y: 200 }, { x: 300, y: 350 });
+  const firstShotPromise = targetPage.waitForEvent("download");
+  await targetPage.locator(".region-snap-capture").click();
+  const firstShot = await blackness(await firstShotPromise);
+  assert.deepEqual(firstShot, { width: 200, height: 150, light: 0 });
+  const { result: rememberedJson } = await evaluateIsolated(
+    "JSON.stringify(globalThis.__rememberedRegions.at(-1) || null)",
+  );
+  const remembered = JSON.parse(rememberedJson.value);
+  assert.deepEqual(remembered, {
+    rect: { left: 100, top: 200, width: 200, height: 150 },
+    scroll: { left: 0, top: 1000 },
+  });
+  // The real worker keeps it for the tab that sent it, in session storage.
+  assert.equal(
+    (
+      await relay.evaluate(
+        (region) => globalThis.chrome.runtime.sendMessage({ type: "REMEMBER_REGION", region }),
+        remembered,
+      )
+    ).ok,
+    true,
+  );
+  const kept = Object.values(
+    await relay.evaluate(() => globalThis.chrome.storage.session.get(null)),
+  );
+  assert.deepEqual(kept, [
+    { left: 100, top: 1200, width: 200, height: 150, scrollLeft: 0, scrollTop: 1000 },
+  ]);
+  const [lastRegion] = kept;
+  await targetPage.keyboard.press("Escape");
+  await targetPage.locator("#region-snap-root").waitFor({ state: "detached" });
+
+  // Scrolled to the top the box is out of the window: the page is scrolled to it for the shot
+  // and put back.
+  await targetPage.evaluate(() => globalThis.scrollTo(0, 0));
+  const downloadsBeforeRecapture = downloadCount;
+  const recapturedPromise = targetPage.waitForEvent("download");
+  await recapture(lastRegion);
+  const recaptured = await blackness(await recapturedPromise);
+  assert.deepEqual(recaptured, { width: 200, height: 150, light: 0 }, "the same part of the page");
+  assert.equal(downloadCount, downloadsBeforeRecapture + 1);
+  await targetPage.locator(".region-snap-toast", { hasText: "overlaySaved" }).waitFor();
+  const { result: scrollsJson } = await evaluateIsolated(
+    "JSON.stringify(globalThis.__captureScrolls)",
+  );
+  assert.equal(JSON.parse(scrollsJson.value).at(-1), 1000, "shot where the region was");
+  assert.equal(await scrollTop(), 0, "the page is scrolled back");
+  assert.equal(await targetPage.locator('#region-snap-root[data-mode="locked"]').count(), 0);
+
+  // When the window shows the whole region it is taken where it is, with no scrolling.
+  await targetPage.evaluate(() => globalThis.scrollTo(0, 1100));
+  const inViewPromise = targetPage.waitForEvent("download");
+  await recapture(lastRegion);
+  assert.deepEqual(await blackness(await inViewPromise), { width: 200, height: 150, light: 0 });
+  const { result: inViewJson } = await evaluateIsolated(
+    "JSON.stringify(globalThis.__captureScrolls)",
+  );
+  assert.equal(JSON.parse(inViewJson.value).at(-1), 1100);
+  assert.equal(await scrollTop(), 1100);
+
+  // Nothing remembered, or a page too short to show the region again, saves nothing.
+  const downloadsBeforeMissing = downloadCount;
+  await recapture(null);
+  await targetPage.locator(".region-snap-toast", { hasText: "overlayNoLastRegion" }).waitFor();
+  await targetPage.evaluate(() => {
+    globalThis.document.body.innerHTML = '<div style="height: 400px"></div>';
+    globalThis.scrollTo(0, 0);
+  });
+  await recapture(lastRegion);
+  await targetPage.locator(".region-snap-toast", { hasText: "overlayLastRegionGone" }).waitFor();
+  await targetPage.waitForTimeout(300);
+  assert.equal(downloadCount, downloadsBeforeMissing);
+  await evaluateIsolated("globalThis.__captureFactory = null");
+  await targetPage.locator("#region-snap-root").waitFor({ state: "detached", timeout: 5000 });
   await relay.close();
 
   // The editor page opens an image file or a pasted image under the same marking tools, and
@@ -1378,6 +1630,27 @@ try {
   for (const line of OCR_LINES) assert.match(editorText, line);
   assert.equal(editorDownloads, 0, "Text from image saves no image");
 
+  // QR code reads an opened image too, through the real runtime messaging, and its link opens
+  // in a new tab from the real service worker.
+  await editor.locator("#file-input").setInputFiles({
+    name: "qr.png",
+    mimeType: "image/png",
+    buffer: await QRCode.toBuffer(qrLink, { margin: 4, scale: 5 }),
+  });
+  await editor.locator(".region-snap-read-qr").click();
+  const editorQr = editor.locator(".region-snap-qr");
+  await editorQr.waitFor({ timeout: 30_000 });
+  assert.equal(await editorQr.locator(".region-snap-qr-text").textContent(), qrLink);
+  const editorOpened = context.waitForEvent("page");
+  await editorQr.locator(".region-snap-qr-open").click();
+  const editorLinkPage = await editorOpened;
+  await editorLinkPage.waitForLoadState();
+  assert.equal(editorLinkPage.url(), qrLink);
+  await editorLinkPage.close();
+  await editor.keyboard.press("Escape");
+  await editorQr.waitFor({ state: "detached" });
+  assert.equal(editorDownloads, 0, "QR code saves no image");
+
   // Esc puts the tool down, the next one closes the image and goes back to the start screen.
   await editor.locator('.region-snap-tool[data-tool="arrow"]').click();
   await editor.keyboard.press("Escape");
@@ -1453,7 +1726,7 @@ try {
   await editorTab.waitForURL(`chrome-extension://${extensionId}/editor.html`);
   await editorTab.close();
   console.log(
-    `Smoke test passed for selection, marks, capture, delay, full page, scrolling capture, burst, capture on change, text from image, the image editor, and popup v${version}.`,
+    `Smoke test passed for selection, marks, capture, delay, full page, scrolling capture, burst, capture on change, text from image, QR code, recapture of the last region, the image editor, and popup v${version}.`,
   );
 } finally {
   await context.close();

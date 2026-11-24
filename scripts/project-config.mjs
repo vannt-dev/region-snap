@@ -36,6 +36,9 @@ export const VENDOR_FILES = Object.freeze({
     from: "node_modules/@tesseract.js-data/vie/4.0.0_best_int/vie.traineddata.gz",
   },
   "vendor/tesseract/LICENSE": { from: "node_modules/tesseract.js-core/LICENSE" },
+  // jsQR (Apache-2.0) reads QR codes in the service worker; it fetches nothing.
+  "vendor/jsqr/jsQR.js": { from: "node_modules/jsqr/dist/jsQR.js" },
+  "vendor/jsqr/LICENSE": { from: "node_modules/jsqr/LICENSE" },
 });
 
 export const RUNTIME_FILES = Object.freeze([
@@ -46,6 +49,7 @@ export const RUNTIME_FILES = Object.freeze([
   "ocr-text.js",
   "ocr.html",
   "ocr-offscreen.js",
+  "qr-code.js",
   "annotations.js",
   "schedule.js",
   "content.js",

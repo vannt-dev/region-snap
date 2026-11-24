@@ -1,8 +1,11 @@
 /*! SPDX-License-Identifier: MIT | Copyright (c) 2026 vannt-dev | github.com/vannt-dev/region-snap */
-importScripts("shared.js");
+// jsQR is a build-time copy (vendor/), so the worker runs from dist/, as the README says.
+importScripts("shared.js", "geometry.js", "qr-code.js", "vendor/jsqr/jsQR.js");
 
 const { ALLOWED_PROTOCOLS, COMMAND_TO_MESSAGE, MESSAGE, OFFSCREEN_TARGET, STATE } =
   globalThis.RegionSnapShared;
+const { rememberRegion } = globalThis.RegionSnapGeometry;
+const { decodeQrPixels, describeQrText, openableUrl, qrScale } = globalThis.RegionSnapQrCode;
 const allowedProtocols = new Set(ALLOWED_PROTOCOLS);
 const validCommands = new Set(Object.values(COMMAND_TO_MESSAGE));
 const injectionTasks = new Map();
@@ -86,6 +89,14 @@ async function ensureInjected(tabId) {
 async function sendCommandToTab(tab, type) {
   assertSupportedTab(tab);
 
+  if (type === MESSAGE.RECAPTURE_REGION) {
+    // Injected even with no region remembered, so the page says so instead of nothing happening.
+    await ensureInjected(tab.id);
+    const region = await getLastRegion(tab.id);
+    const response = await chrome.tabs.sendMessage(tab.id, { type, region });
+    return response || { ok: true };
+  }
+
   if (type === MESSAGE.START_PICKING || type === MESSAGE.CAPTURE_FULL_PAGE) {
     await ensureInjected(tab.id);
   } else if (!(await isInjected(tab.id))) {
@@ -95,6 +106,44 @@ async function sendCommandToTab(tab, type) {
   const response = await chrome.tabs.sendMessage(tab.id, { type });
   return response || { ok: true };
 }
+
+// "Recapture last region" finds the region a tab last captured. It is kept per tab in session
+// storage, which is held in memory and emptied when the browser closes, so it outlasts a reload
+// of the page and a restart of this worker. Only the box and the scroll position are kept.
+const LAST_REGION_PREFIX = "lastRegion:";
+
+async function getLastRegion(tabId) {
+  if (!chrome.storage?.session) return null;
+  try {
+    const key = `${LAST_REGION_PREFIX}${tabId}`;
+    const stored = (await chrome.storage.session.get(key))?.[key];
+    if (!stored) return null;
+    // Read back through the same check it was stored with.
+    const scroll = { left: stored.scrollLeft, top: stored.scrollTop };
+    return rememberRegion(
+      {
+        left: stored.left - scroll.left,
+        top: stored.top - scroll.top,
+        width: stored.width,
+        height: stored.height,
+      },
+      scroll,
+    );
+  } catch {
+    return null;
+  }
+}
+
+async function setLastRegion(tabId, region) {
+  const value = rememberRegion(region?.rect, region?.scroll);
+  if (!value || !chrome.storage?.session) return { ok: false };
+  await chrome.storage.session.set({ [`${LAST_REGION_PREFIX}${tabId}`]: value });
+  return { ok: true };
+}
+
+chrome.tabs.onRemoved?.addListener((tabId) => {
+  chrome.storage?.session?.remove(`${LAST_REGION_PREFIX}${tabId}`).catch(() => {});
+});
 
 async function getActiveTab() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -122,14 +171,16 @@ async function getActiveStatus() {
     } catch {
       // A missing receiver simply means this tab has no active selection session yet.
     }
+    const hasLastRegion = Boolean(await getLastRegion(tab.id));
     if (!response?.ready || response.version !== CONTENT_VERSION) {
-      return { ok: true, supported: true, state: STATE.IDLE, rect: null };
+      return { ok: true, supported: true, state: STATE.IDLE, rect: null, hasLastRegion };
     }
     return {
       ok: true,
       supported: true,
       state: response.state || STATE.IDLE,
       rect: response.rect || null,
+      hasLastRegion,
     };
   } catch (error) {
     return {
@@ -236,6 +287,53 @@ async function readImageText(dataUrl) {
   return turn;
 }
 
+// A QR code is read here, in the worker: jsQR is plain JavaScript and the worker can draw the
+// region on an OffscreenCanvas, so no page or document has to be opened for it.
+async function readQrCode(dataUrl) {
+  if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/")) {
+    return { error: t("errorReadQr") };
+  }
+  try {
+    const bitmap = await createImageBitmap(await (await fetch(dataUrl)).blob());
+    try {
+      const scale = qrScale(bitmap);
+      const width = Math.max(1, Math.round(bitmap.width * scale));
+      const height = Math.max(1, Math.round(bitmap.height * scale));
+      const canvas = new OffscreenCanvas(width, height);
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      // Transparent pixels would read as black, as dark as the code's own modules.
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, width, height);
+      context.drawImage(bitmap, 0, 0, width, height);
+      const text = decodeQrPixels(globalThis.jsQR, context.getImageData(0, 0, width, height));
+      return text == null ? { found: false } : { found: true, ...describeQrText(text) };
+    } finally {
+      bitmap.close();
+    }
+  } catch (error) {
+    console.warn("Region Snap QR code reading failed:", error);
+    return { error: t("errorReadQr") };
+  }
+}
+
+// The address is checked again here: only http and https are opened, next to the tab it was
+// read in.
+async function openQrLink(url, sender) {
+  const href = openableUrl(url);
+  if (!href) return { ok: false, error: t("errorOpenQrLink") };
+  try {
+    await chrome.tabs.create({
+      url: href,
+      ...(sender.tab?.id != null && { openerTabId: sender.tab.id }),
+      ...(Number.isInteger(sender.tab?.index) && { index: sender.tab.index + 1 }),
+      ...(sender.tab?.windowId != null && { windowId: sender.tab.windowId }),
+    });
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: getFriendlyError(error) };
+  }
+}
+
 chrome.commands.onCommand.addListener(async (command, tab) => {
   const type = COMMAND_TO_MESSAGE[command];
   if (!type) return;
@@ -261,6 +359,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message?.type === MESSAGE.READ_IMAGE_TEXT && sender.tab) {
     readImageText(message.dataUrl).then(sendResponse);
+    return true;
+  }
+
+  if (message?.type === MESSAGE.READ_QR_CODE && sender.tab) {
+    readQrCode(message.dataUrl).then(sendResponse);
+    return true;
+  }
+
+  if (message?.type === MESSAGE.OPEN_QR_LINK && sender.tab) {
+    openQrLink(message.url, sender).then(sendResponse);
+    return true;
+  }
+
+  if (message?.type === MESSAGE.REMEMBER_REGION && sender.tab?.id != null) {
+    setLastRegion(sender.tab.id, message.region).then(sendResponse, () =>
+      sendResponse({ ok: false }),
+    );
     return true;
   }
 

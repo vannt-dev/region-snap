@@ -29,6 +29,8 @@ Key features:
 - Copy to the clipboard, a capture delay, and PNG, JPEG or WebP output
 - Copy text: put the page text inside the region on the clipboard
 - Text from image: recognise English and Vietnamese text in pictures, videos and canvases, offline
+- QR code: read a QR code in the region, then copy its text or open its link, offline
+- Capture last region again with one shortcut, without selecting it again
 - Accurate cropping across browser zoom and display scaling
 - Rounded PNG output with transparent corners
 - Keyboard shortcuts for fast selection and capture
@@ -50,7 +52,7 @@ Region Snap's single purpose is to let users select and save a precise region of
 
 **`offscreen`:** Required for "Text from image". When the user picks that action, the service worker opens a hidden extension page that runs the bundled Tesseract text recognition (WebAssembly in a worker, which a service worker cannot host) on the captured region, then closes it. The image is processed only in the browser and nothing is downloaded or sent.
 
-**`storage`:** Required to remember the user's preferences (image format, rounded corners, file name prefix, default action, capture delay, burst and capture-on-change counts) in `chrome.storage.local` on the device. No page content, URL or screenshot is stored.
+**`storage`:** Required to remember the user's preferences (image format, rounded corners, file name prefix, default action, capture delay, burst and capture-on-change counts) in `chrome.storage.local` on the device, and, for "Capture last region again", the position and size of the last region each tab captured in `chrome.storage.session` (held in memory, cleared when the browser closes). No page content, URL or screenshot is stored.
 
 ### Data-use disclosure
 

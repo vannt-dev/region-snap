@@ -20,6 +20,7 @@ flowchart TB
     select --> mark["Mark it<br/>arrow, box,<br/>text, hide"]
     mark --> shot["Capture region,<br/>scrolling area,<br/>burst or watch"]
     full["Full page<br/>popup or<br/>Alt+Shift+F"] --> file
+    again["Last region<br/>again<br/>Alt+Shift+L"] --> file
     shot --> file["PNG, JPEG or<br/>WebP, download<br/>or clipboard"]
   end
   geo["geometry.js<br/>shared region<br/>and crop math"]
@@ -56,6 +57,13 @@ flowchart TB
   Vietnamese are recognised offline with Tesseract, which ships inside the extension: nothing is
   downloaded and the image never leaves the browser. Reading takes a few seconds, and marks drawn
   on the region are left out. A Chrome version too old to run it says so instead.
+- **QR code** reads a QR code in the region's pixels: click the button, or press `Q` on the `⠿`
+  handle. A panel shows what the code holds, as plain text, with **Copy**. When it is a web
+  address (`http` or `https`) the panel shows the whole address and, in bold, the host it leads
+  to, and **Open link** opens it in a new tab. Nothing is copied or opened until you click. The
+  code is decoded by jsQR, which ships inside the extension: nothing is downloaded and the image
+  never leaves the browser. It works on an image opened in the editor too. Only QR codes are
+  read, not other barcodes.
 - Mark the locked region before capturing: the toolbar draws an **arrow** `↗`, a **box** `▢`, or
   **hides an area** `▒` behind a mosaic, and `↶` (or `Ctrl+Z` while a tool is held) removes the last
   mark. With a tool chosen a drag inside the region draws; `Esc` puts the tool down and the page is
@@ -81,6 +89,13 @@ flowchart TB
   stitches the slices into one image, without the scrollbar. A fixed header is kept in the first
   slice and a fixed footer in the last instead of repeating down the image; sticky elements sit
   where they are in the flow. The page is scrolled back when it is done, and `Esc` stops it.
+- **Capture last region again** (popup, or `Alt+Shift+L`) captures the region this tab last
+  captured once more, with no selecting, using the format, corners and default action from the
+  settings (not the delay, and not the marks of that capture). The region keeps its place on the
+  page: when the page has been scrolled so that the window no longer shows all of it, the page is
+  scrolled back to it for the shot and then returned. The region is remembered for each tab until
+  the tab closes or the browser quits, so it outlasts a reload. When the window has become too
+  small, or the page too short, to show the whole region again, it says so and saves nothing.
 - **Capture a scrolling area** `⇣` (toolbar) photographs everything a panel that scrolls on its
   own holds, when the locked region sits in one (chat threads, mail lists, side panels), or an
   element taller than the window. It scrolls a window at a time and stitches the slices,
@@ -160,11 +175,13 @@ After every source change, click **Reload** on the extension card before testing
 4. Interact with the page as needed to reach the exact state you want to capture.
 5. Click **Capture**, press `Enter`, or use `Alt+Shift+C`. To take the text instead of an image,
    click **Copy text** or press `T`; to read the text in a picture, video or canvas, click
-   **Text from image** or press `Shift+T`.
+   **Text from image** or press `Shift+T`; to read a QR code, click **QR code** or press `Q`.
 6. Press `Esc` or the **×** button to close the overlay.
 
 For the whole page instead of a region, choose **Capture full page** in the popup or press
-`Alt+Shift+F`; it uses the image format and the default action from the settings.
+`Alt+Shift+F`; it uses the image format and the default action from the settings. To take the
+region you last captured in this tab again, press `Alt+Shift+L` or choose **Capture last region
+again** in the popup.
 
 To mark up a screenshot or picture you already have, choose **Open or paste an image** in the
 popup, then open a file, press `Ctrl+V`, or drop the image on the page.
@@ -178,7 +195,9 @@ Keyboard shortcuts can be changed at `chrome://extensions/shortcuts`.
 - `offscreen`: opens a hidden extension page that runs the bundled text recognition while
   **Text from image** reads a region, and closes it right after. It shows no install warning.
 - `storage`: keeps the settings (image format, corners, file name prefix, default action,
-  capture delay, burst and capture-on-change counts) on this device. Nothing else is stored.
+  capture delay, burst and capture-on-change counts) on this device. While the browser runs it
+  also holds, for each tab, the position and size of the last region captured there (no address,
+  no image), for **Capture last region again**. Nothing else is stored.
 
 The extension processes images entirely in the browser and never sends images to a server.
 

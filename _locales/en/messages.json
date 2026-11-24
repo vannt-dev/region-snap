@@ -7,6 +7,7 @@
   "commandStart": { "message": "Select a region or element" },
   "commandCapture": { "message": "Capture the locked region" },
   "commandFullPage": { "message": "Capture the full page" },
+  "commandRecapture": { "message": "Capture the last region again" },
   "popupTagline": { "message": "Capture the exact moment" },
   "popupFlow": { "message": "Select → interact → capture" },
   "popupSelect": { "message": "Select a region" },
@@ -14,6 +15,7 @@
   "popupCapture": { "message": "Capture region" },
   "popupReselect": { "message": "Select again" },
   "popupFullPage": { "message": "Capture full page" },
+  "popupRecapture": { "message": "Capture last region again" },
   "popupReady": { "message": "Ready to select" },
   "popupLocked": { "message": "Region locked" },
   "popupUnavailable": { "message": "Unavailable on this page" },
@@ -40,6 +42,18 @@
   "overlayNoTextFound": { "message": "No text found in the selection." },
   "overlayCopyTextFailed": { "message": "This page blocks the clipboard — text not copied" },
   "overlayTextCopiedOne": { "message": "Copied 1 line of text" },
+  "overlayReadQr": { "message": "QR code" },
+  "overlayReadQrTitle": { "message": "Read a QR code in the region (Q)" },
+  "overlayNoQrFound": { "message": "No QR code found in the selection." },
+  "overlayQrTitle": { "message": "QR code" },
+  "overlayQrOpensOn": { "message": "Link to" },
+  "overlayQrOpen": { "message": "Open link" },
+  "overlayQrClose": { "message": "Close" },
+  "overlayQrCopied": { "message": "Copied the QR code's text" },
+  "overlayNoLastRegion": {
+    "message": "Nothing has been captured in this tab yet: select a region first."
+  },
+  "overlayLastRegionGone": { "message": "The last region no longer fits in the window." },
   "overlayTextCopied": {
     "message": "Copied $COUNT$ lines of text",
     "placeholders": { "count": { "content": "$1" } }
@@ -124,6 +138,8 @@
     "message": "Reading text from images needs a newer version of Chrome."
   },
   "errorNoLockedRegion": { "message": "No region is locked on this tab." },
+  "errorReadQr": { "message": "Could not read the QR code." },
+  "errorOpenQrLink": { "message": "Only a web address (http or https) can be opened." },
   "popupOpenImage": { "message": "Open or paste an image" },
   "editorTitle": { "message": "Mark up an image" },
   "editorOpen": { "message": "Open image" },

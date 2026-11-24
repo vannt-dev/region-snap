@@ -5,9 +5,13 @@
     CAPTURE_TAB: "CAPTURE_TAB",
     DO_CAPTURE: "DO_CAPTURE",
     GET_ACTIVE_STATUS: "GET_ACTIVE_STATUS",
+    OPEN_QR_LINK: "OPEN_QR_LINK",
     PING: "PING",
     READ_IMAGE_TEXT: "READ_IMAGE_TEXT",
+    READ_QR_CODE: "READ_QR_CODE",
+    RECAPTURE_REGION: "RECAPTURE_REGION",
     RECOGNIZE_TEXT: "RECOGNIZE_TEXT",
+    REMEMBER_REGION: "REMEMBER_REGION",
     RUN_COMMAND: "RUN_COMMAND",
     START_PICKING: "START_PICKING",
   });
@@ -27,12 +31,14 @@
   const COMMAND_TO_MESSAGE = Object.freeze({
     "capture-full-page": MESSAGE.CAPTURE_FULL_PAGE,
     "capture-region": MESSAGE.DO_CAPTURE,
+    "recapture-region": MESSAGE.RECAPTURE_REGION,
     "toggle-picker": MESSAGE.START_PICKING,
   });
 
   const DEFAULT_SHORTCUTS = Object.freeze({
     "capture-full-page": "Alt+Shift+F",
     "capture-region": "Alt+Shift+C",
+    "recapture-region": "Alt+Shift+L",
     "toggle-picker": "Alt+Shift+S",
   });
 
