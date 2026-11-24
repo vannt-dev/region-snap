@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { DIST_DIR, ROOT, RUNTIME_FILES, STORE_ASSETS } from "./project-config.mjs";
+import { DIST_DIR, ROOT, RUNTIME_FILES, STORE_ASSETS, VENDOR_FILES } from "./project-config.mjs";
+import { findRemoteCode } from "./remote-code.mjs";
 
 const PNG_SIGNATURE = "89504e470d0a1a0a";
 
@@ -47,7 +48,17 @@ async function validateRuntime(baseDir) {
   const manifest = await readJson(path.join(baseDir, "manifest.json"));
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.default_locale, "en", "English must remain the primary locale");
-  assert.deepEqual([...manifest.permissions].sort(), ["activeTab", "scripting", "storage"]);
+  assert.deepEqual([...manifest.permissions].sort(), [
+    "activeTab",
+    "offscreen",
+    "scripting",
+    "storage",
+  ]);
+  assert.equal(
+    manifest.content_security_policy?.extension_pages,
+    "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'",
+    "extension pages may run the bundled WebAssembly and nothing from elsewhere",
+  );
   assert.equal(manifest.content_scripts, undefined, "content scripts must remain on-demand");
 
   const localesDirectory = path.join(baseDir, "_locales");
@@ -87,11 +98,21 @@ async function validateRuntime(baseDir) {
       /<script[^>]+src=["']https?:/i,
       `${relativePath} loads remote code`,
     );
+    // Tesseract's worker looks for the global object with `new Function("return this")()` in a
+    // try block, a bundler's fallback for browsers without `globalThis`; Chrome has it, so that
+    // line never runs. Nothing else may build code from text.
+    const checked = VENDOR_FILES[relativePath]
+      ? source.replaceAll('new Function("return this")()', "")
+      : source;
     assert.doesNotMatch(
-      source,
+      checked,
       /\b(?:eval|new Function)\s*\(/,
       `${relativePath} uses dynamic code`,
     );
+  }
+  for (const relativePath of entries.filter((file) => /\.(?:css|html|js|json)$/.test(file))) {
+    const found = findRemoteCode(await fs.readFile(path.join(baseDir, relativePath), "utf8"));
+    assert.deepEqual(found, [], `${relativePath} names remotely hosted code`);
   }
 }
 

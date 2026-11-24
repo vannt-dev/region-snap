@@ -217,12 +217,14 @@
 }
 
 #region-snap-root .region-snap-copy,
-#region-snap-root .region-snap-copy-text {
+#region-snap-root .region-snap-copy-text,
+#region-snap-root .region-snap-read-text {
   color: #e2e8f0 !important;
   background: #1e293b !important;
 }
 #region-snap-root .region-snap-copy:hover,
-#region-snap-root .region-snap-copy-text:hover {
+#region-snap-root .region-snap-copy-text:hover,
+#region-snap-root .region-snap-read-text:hover {
   background: #334155 !important;
 }
 

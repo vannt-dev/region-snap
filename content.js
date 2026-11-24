@@ -201,6 +201,7 @@
       <button class="region-snap-capture" type="button">${t("overlayCapture")}</button>
       <button class="region-snap-copy" type="button">${t("overlayCopy")}</button>
       <button class="region-snap-copy-text" type="button" title="${t("overlayCopyTextTitle")}">${t("overlayCopyText")}</button>
+      <button class="region-snap-read-text" type="button" title="${t("overlayReadTextTitle")}">${t("overlayReadText")}</button>
       <button class="region-snap-cancel" type="button" title="${t("overlayCancel")}" aria-label="${t("overlayCancel")}">×</button>
     `;
     gripButton = toolbar.querySelector(".region-snap-grip");
@@ -263,6 +264,9 @@
     });
     toolbar.querySelector(".region-snap-copy-text").addEventListener("click", (event) => {
       if (event.isTrusted) copyRegionText();
+    });
+    toolbar.querySelector(".region-snap-read-text").addEventListener("click", (event) => {
+      if (event.isTrusted) copyImageText();
     });
     toolbar.querySelector(".region-snap-cancel").addEventListener("click", (event) => {
       if (event.isTrusted) reset();
@@ -793,13 +797,16 @@
     }
   }
 
-  function showToast(message, kind = "info") {
+  // `lasting` keeps the toast up until the next one replaces it, for work that takes a while.
+  function showToast(message, kind = "info", { lasting = false } = {}) {
     if (!toast) return;
     clearTimeout(toastTimer);
     toast.textContent = message;
     toast.dataset.kind = kind;
     toast.classList.add("is-visible");
-    toastTimer = window.setTimeout(() => toast?.classList.remove("is-visible"), 2600);
+    if (!lasting) {
+      toastTimer = window.setTimeout(() => toast?.classList.remove("is-visible"), 2600);
+    }
   }
 
   function setCursor(value) {
@@ -1085,8 +1092,9 @@
       doCapture();
       return;
     }
-    // T copies the region's text, like on the desktop app. Only from the grip, like Enter, so
-    // typing on the page around a locked region is left alone.
+    // T copies the region's text, like on the desktop app, and Shift+T reads the text in its
+    // pixels. Only from the grip, like Enter, so typing on the page around a locked region is
+    // left alone.
     if (
       event.key.toLowerCase() === "t" &&
       state === STATE.LOCKED &&
@@ -1097,7 +1105,8 @@
     ) {
       event.preventDefault();
       event.stopImmediatePropagation();
-      copyRegionText();
+      if (event.shiftKey) copyImageText();
+      else copyRegionText();
       return;
     }
     if (moveWithKeyboard(event)) event.preventDefault();
@@ -1553,6 +1562,81 @@
       );
     }
     return true;
+  }
+
+  function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error || new Error(t("overlayReadTextError")));
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  // Reads the text in the region's pixels (a picture, a video frame, a canvas) with the OCR
+  // that ships inside the extension, and copies it. The marks are left out, or they would be
+  // read as text; like "Copy text", nothing is copied when no text is found.
+  async function copyImageText() {
+    if (state !== STATE.LOCKED || !rect) {
+      showToast(t("overlaySelectFirst"), "error");
+      return false;
+    }
+    if (capturing) return false;
+
+    capturing = true;
+    const captureSession = sessionId;
+    const selectedRect = { ...rect };
+    const plain = { format: "png", roundedCorners: false };
+    try {
+      let blob;
+      if (imageSource) {
+        blob = await imageToBlob(imageSource, plain, []);
+      } else {
+        root.dataset.capturing = "true";
+        await nextFrame();
+        await nextFrame();
+        if (captureSession !== sessionId) return false;
+        const response = await chrome.runtime.sendMessage({ type: MESSAGE.CAPTURE_TAB });
+        if (captureSession !== sessionId) return false;
+        root.dataset.capturing = "false";
+        if (!response || response.error) {
+          throw new Error(response?.error || t("overlayCaptureMissing"));
+        }
+        blob = await cropToBlob(response.dataUrl, selectedRect, plain, []);
+      }
+      const dataUrl = await blobToDataUrl(blob);
+      if (captureSession !== sessionId) return false;
+      showToast(t("overlayReadingText"), "info", { lasting: true });
+      const result = await chrome.runtime.sendMessage({ type: MESSAGE.READ_IMAGE_TEXT, dataUrl });
+      if (captureSession !== sessionId) return false;
+      if (!result || result.error) throw new Error(result?.error || t("overlayReadTextError"));
+      if (!result.lineCount) {
+        showToast(t("overlayNoTextFound"), "error");
+        return false;
+      }
+      if (!(await writeClipboardText(result.text))) {
+        if (root) showToast(t("overlayCopyTextFailed"), "error");
+        return false;
+      }
+      if (root) {
+        showToast(
+          result.lineCount === 1
+            ? t("overlayTextCopiedOne")
+            : t("overlayTextCopied", [String(result.lineCount)]),
+          "success",
+        );
+      }
+      return true;
+    } catch (error) {
+      if (root && captureSession === sessionId) {
+        root.dataset.capturing = "false";
+        showToast(error?.message || t("overlayReadTextError"), "error");
+      }
+      console.error("Region Snap text recognition failed:", error);
+      return false;
+    } finally {
+      if (captureSession === sessionId) capturing = false;
+    }
   }
 
   // `action` is "download" or "copy"; left out, the user's default action applies.

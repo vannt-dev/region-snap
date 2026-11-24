@@ -31,6 +31,12 @@
   "overlayCopy": { "message": "Copy" },
   "overlayCopyText": { "message": "Copy text" },
   "overlayCopyTextTitle": { "message": "Copy the page text inside the region (T)" },
+  "overlayReadText": { "message": "Text from image" },
+  "overlayReadTextTitle": {
+    "message": "Recognise the text in the region's pixels and copy it (Shift+T)"
+  },
+  "overlayReadingText": { "message": "Reading text…" },
+  "overlayReadTextError": { "message": "Could not read the text." },
   "overlayNoTextFound": { "message": "No text found in the selection." },
   "overlayCopyTextFailed": { "message": "This page blocks the clipboard — text not copied" },
   "overlayTextCopiedOne": { "message": "Copied 1 line of text" },
@@ -113,6 +119,10 @@
   "errorInvalidCommand": { "message": "Invalid command." },
   "errorUnknownCaptureTab": { "message": "Could not identify the tab to capture." },
   "errorTabChanged": { "message": "The active tab changed before the screenshot was captured." },
+  "errorReadText": { "message": "Could not read the text." },
+  "errorReadTextUnsupported": {
+    "message": "Reading text from images needs a newer version of Chrome."
+  },
   "errorNoLockedRegion": { "message": "No region is locked on this tab." },
   "popupOpenImage": { "message": "Open or paste an image" },
   "editorTitle": { "message": "Mark up an image" },

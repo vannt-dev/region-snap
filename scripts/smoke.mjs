@@ -4,7 +4,7 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { chromium } from "playwright";
-import { DIST_DIR } from "./project-config.mjs";
+import { DIST_DIR, ROOT } from "./project-config.mjs";
 
 const profile = await fs.mkdtemp(path.join(os.tmpdir(), "region-snap-smoke-"));
 const server = http.createServer((_request, response) => {
@@ -23,10 +23,24 @@ await new Promise((resolve, reject) => {
   server.listen(0, "127.0.0.1", resolve);
 });
 const { port } = server.address();
+// The image the desktop OCR test reads: four lines of English and Vietnamese text.
+const OCR_FIXTURE = await fs.readFile(path.join(ROOT, "tests", "fixtures", "ocr-en-vi.png"));
+const OCR_LINES = [
+  /Region Snap copies text offline\./,
+  /Invoice total: 1,250\.00 USD/,
+  /Tiếng Việt có dấu: Xin chào thế giới/,
+  /Ảnh chụp màn hình được lưu\./,
+];
 const context = await chromium.launchPersistentContext(profile, {
   channel: "chromium",
   headless: true,
-  args: [`--disable-extensions-except=${DIST_DIR}`, `--load-extension=${DIST_DIR}`],
+  args: [
+    `--disable-extensions-except=${DIST_DIR}`,
+    `--load-extension=${DIST_DIR}`,
+    // No host but the local test server resolves, so text recognition can only work with the
+    // files inside the extension: a CDN fallback would fail the run.
+    "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1",
+  ],
 });
 
 try {
@@ -74,6 +88,12 @@ try {
             }
           },
           sendMessage: async (message) => {
+            // Handed to the real service worker by the test (relayTextRead below).
+            if (message.type === "READ_IMAGE_TEXT") {
+              return new Promise((resolve) => {
+                globalThis.__readTextRequest = { dataUrl: message.dataUrl, resolve };
+              });
+            }
             if (message.type !== "CAPTURE_TAB") return { ok: true };
             if (globalThis.__delayCapture) {
               return new Promise((resolve) => {
@@ -1137,6 +1157,84 @@ try {
   await targetPage.keyboard.press("Escape");
   await targetPage.locator("#region-snap-root").waitFor({ state: "detached" });
 
+  // Text from image reads the pixels of the region, here a picture of text the page's own text
+  // does not hold. The content script's request goes to the real service worker, which opens
+  // the offscreen document and runs the bundled Tesseract on it.
+  const relay = await context.newPage();
+  await relay.goto(`chrome-extension://${extensionId}/popup.html`);
+  const offscreenDocuments = () =>
+    relay.evaluate(
+      async () =>
+        (await globalThis.chrome.runtime.getContexts({ contextTypes: ["OFFSCREEN_DOCUMENT"] }))
+          .length,
+    );
+  async function relayTextRead() {
+    let dataUrl = "";
+    for (let tries = 0; !dataUrl && tries < 200; tries += 1) {
+      const { result } = await evaluateIsolated("globalThis.__readTextRequest?.dataUrl || ''");
+      dataUrl = result.value;
+      if (!dataUrl) await targetPage.waitForTimeout(25);
+    }
+    assert.ok(dataUrl.startsWith("data:image/png;base64,"), "the region is sent as a PNG");
+    const started = Date.now();
+    const response = await relay.evaluate(
+      (image) => globalThis.chrome.runtime.sendMessage({ type: "READ_IMAGE_TEXT", dataUrl: image }),
+      dataUrl,
+    );
+    const seconds = ((Date.now() - started) / 1000).toFixed(1);
+    await evaluateIsolated(
+      `globalThis.__readTextRequest.resolve(${JSON.stringify(response)});
+       globalThis.__readTextRequest = null;`,
+    );
+    return { response, seconds };
+  }
+  const fixtureSize = { width: OCR_FIXTURE.readUInt32BE(16), height: OCR_FIXTURE.readUInt32BE(20) };
+  await targetPage.evaluate(
+    (src) => {
+      const { document } = globalThis;
+      document.body.style.cssText = "margin: 0; padding: 0; background: #fff";
+      document.body.innerHTML = `<img id="text-picture" alt="" src="${src}"
+      style="position: absolute; left: 40px; top: 40px">`;
+      globalThis.scrollTo(0, 0);
+      return document.getElementById("text-picture").decode();
+    },
+    `data:image/png;base64,${OCR_FIXTURE.toString("base64")}`,
+  );
+  const screenshot = await targetPage.screenshot();
+  await evaluateIsolated(
+    `globalThis.__captureDataUrl = ${JSON.stringify(`data:image/png;base64,${screenshot.toString("base64")}`)}`,
+  );
+  const pictureArea = [
+    { x: 30, y: 30 },
+    { x: 50 + fixtureSize.width, y: 50 + fixtureSize.height },
+  ];
+  const downloadsBeforeOcr = downloadCount;
+  await setClipboard("before");
+  await selectArea(...pictureArea);
+  await targetPage.locator(".region-snap-read-text").click();
+  const firstRead = await relayTextRead();
+  assert.equal(firstRead.response.error, undefined, firstRead.response.error);
+  await targetPage.locator(".region-snap-toast", { hasText: "overlayTextCopied" }).waitFor();
+  const recognized = await readClipboard();
+  for (const line of OCR_LINES) assert.match(recognized, line);
+  assert.equal(firstRead.response.lineCount, OCR_LINES.length);
+  assert.equal(downloadCount, downloadsBeforeOcr, "Text from image saves no image");
+  assert.equal(await targetPage.locator('#region-snap-root[data-capturing="false"]').count(), 1);
+  assert.equal(await offscreenDocuments(), 0, "the offscreen document closes after reading");
+  console.log(`Text from image read in ${firstRead.seconds} s:\n${recognized}`);
+
+  // Shift+T on the grip does the same.
+  await setClipboard("before");
+  await targetPage.locator(".region-snap-grip").focus();
+  await targetPage.keyboard.press("Shift+T");
+  const secondRead = await relayTextRead();
+  await targetPage.locator(".region-snap-toast", { hasText: "overlayTextCopied" }).waitFor();
+  assert.equal(await readClipboard(), recognized);
+  assert.equal(secondRead.response.text, firstRead.response.text);
+  await targetPage.keyboard.press("Escape");
+  await targetPage.locator("#region-snap-root").waitFor({ state: "detached" });
+  await relay.close();
+
   // The editor page opens an image file or a pasted image under the same marking tools, and
   // saves it whole at its own resolution, not as a screenshot of the window.
   const editor = await context.newPage();
@@ -1259,6 +1357,27 @@ try {
   assert.equal(await editor.locator(".region-snap-undo").isDisabled(), true);
   assert.equal(await editor.locator(".stage__image").count(), 1);
 
+  // Text from image reads an opened image whole, through the real runtime messaging.
+  await editor.locator("#file-input").setInputFiles({
+    name: "text.png",
+    mimeType: "image/png",
+    buffer: OCR_FIXTURE,
+  });
+  await editor
+    .locator(".region-snap-size", { hasText: `${fixtureSize.width} × ${fixtureSize.height}` })
+    .waitFor();
+  const linesCopied = await editor.evaluate(
+    (count) => globalThis.chrome.i18n.getMessage("overlayTextCopied", [String(count)]),
+    OCR_LINES.length,
+  );
+  await editor.locator(".region-snap-read-text").click();
+  await editor.locator(".region-snap-toast", { hasText: linesCopied }).waitFor({ timeout: 60_000 });
+  const editorText = (
+    await editor.evaluate(() => globalThis.navigator.clipboard.readText())
+  ).replace(/\r\n/g, "\n");
+  for (const line of OCR_LINES) assert.match(editorText, line);
+  assert.equal(editorDownloads, 0, "Text from image saves no image");
+
   // Esc puts the tool down, the next one closes the image and goes back to the start screen.
   await editor.locator('.region-snap-tool[data-tool="arrow"]').click();
   await editor.keyboard.press("Escape");
@@ -1334,7 +1453,7 @@ try {
   await editorTab.waitForURL(`chrome-extension://${extensionId}/editor.html`);
   await editorTab.close();
   console.log(
-    `Smoke test passed for selection, marks, capture, delay, full page, scrolling capture, burst, capture on change, the image editor, and popup v${version}.`,
+    `Smoke test passed for selection, marks, capture, delay, full page, scrolling capture, burst, capture on change, text from image, the image editor, and popup v${version}.`,
   );
 } finally {
   await context.close();

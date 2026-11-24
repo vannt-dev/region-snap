@@ -7,6 +7,7 @@ require("./schedule.test.js");
 require("./desktop-capture.test.js");
 require("./desktop-i18n.test.js");
 require("./desktop-ocr.test.js");
+require("./extension-ocr.test.js");
 require("./performance.test.js");
 require("./background.test.js");
 require("./store-zip.test.js");

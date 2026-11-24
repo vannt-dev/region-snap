@@ -1,7 +1,8 @@
 # Architecture
 
 Region Snap deliberately uses plain JavaScript and Chrome Manifest V3 APIs. There is no runtime
-framework or bundler, which keeps the Store package small and makes its contents auditable.
+framework or bundler, which keeps the Store package auditable. Most of the package's size (about
+8.4 MiB of 8.5) is the bundled text recognition.
 
 ## Runtime boundaries
 
@@ -10,7 +11,15 @@ framework or bundler, which keeps the Store package small and makes its contents
   contract: the defaults, `normalizeSettings` and `buildFileName`. Every reader of stored settings
   goes through `normalizeSettings`.
 - `background.js` owns Chrome-only operations: active-tab validation, on-demand injection, command
-  routing, and visible-tab capture.
+  routing, visible-tab capture, and the offscreen document for text from an image: it opens
+  `ocr.html` when a read starts, lets reads take turns, and closes it after the last one.
+- `ocr-offscreen.js` runs in that offscreen document and reads a region's PNG with Tesseract.
+  The worker, the WebAssembly cores and the English and Vietnamese models are copied from
+  `node_modules` into `vendor/tesseract/` by the build (`VENDOR_FILES` in
+  `scripts/project-config.mjs`); every path is passed explicitly, the build strips the library's
+  CDN defaults and fails on any script address left, and the manifest's CSP adds only
+  `'wasm-unsafe-eval'`. `ocr-text.js` holds what the desktop app shares with it: the languages,
+  the upscaling of small regions and the clean-up of the recognised text.
 - `geometry.js` contains pure rectangle and crop calculations. Keep DOM and Chrome APIs out of this
   module so it remains straightforward to unit test.
 - `annotations.js` holds the marks' geometry and drawing, and `schedule.js` the timing of burst and

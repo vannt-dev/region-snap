@@ -28,6 +28,7 @@ Key features:
 - Burst shots and capture on change, saved as numbered files
 - Copy to the clipboard, a capture delay, and PNG, JPEG or WebP output
 - Copy text: put the page text inside the region on the clipboard
+- Text from image: recognise English and Vietnamese text in pictures, videos and canvases, offline
 - Accurate cropping across browser zoom and display scaling
 - Rounded PNG output with transparent corners
 - Keyboard shortcuts for fast selection and capture
@@ -46,6 +47,8 @@ Region Snap's single purpose is to let users select and save a precise region of
 **`activeTab`:** Required to capture the currently visible tab only after the user explicitly clicks the extension action or invokes a Region Snap keyboard shortcut.
 
 **`scripting`:** Required to inject the region-selection overlay into the active tab after an explicit user action. The extension does not inject into every page at load time.
+
+**`offscreen`:** Required for "Text from image". When the user picks that action, the service worker opens a hidden extension page that runs the bundled Tesseract text recognition (WebAssembly in a worker, which a service worker cannot host) on the captured region, then closes it. The image is processed only in the browser and nothing is downloaded or sent.
 
 **`storage`:** Required to remember the user's preferences (image format, rounded corners, file name prefix, default action, capture delay, burst and capture-on-change counts) in `chrome.storage.local` on the device. No page content, URL or screenshot is stored.
 

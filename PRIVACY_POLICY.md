@@ -1,6 +1,6 @@
 # Privacy Policy for Region Snap
 
-Last updated: October 29, 2026
+Last updated: November 24, 2026
 
 ## Overview
 
@@ -13,12 +13,14 @@ Region Snap captures a user-selected portion of the currently visible browser ta
 - Region Snap does not store browsing history, page URLs, page content, screenshots, or form data.
 - A screenshot is held in memory only long enough to crop the selected region and create the image requested by the user.
 - The resulting image is downloaded directly to the user's device, or placed on the clipboard when the user chooses to copy it.
+- When the user picks Text from image, the text in the selected region is recognised inside the browser by the text recognition that ships with the extension, and only the text is placed on the clipboard. The image is not sent anywhere.
 - Region Snap stores its preferences on the device (image format, rounded corners, file name prefix, default action, capture delay, burst and capture-on-change counts, and the last mark and highlighter colours). They never leave the device.
 
 ## Permission usage
 
 - `activeTab` gives temporary access to the current tab only after the user clicks the extension or invokes its keyboard shortcut. It is required to capture the visible tab selected by the user.
 - `scripting` injects the region-selection interface into the active tab only after an explicit user action.
+- `offscreen` opens a hidden extension page that runs the bundled text recognition while Text from image reads a region, and closes it right after.
 - `storage` keeps the preferences listed above in the browser's local extension storage.
 
 ## Remote services

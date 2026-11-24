@@ -21,7 +21,14 @@ bản nào không có ở đó thì không phải do vannt-dev phát hành.
   đang được focus (nút này tự nhận focus khi vùng khoá). Tiện ích đọc chính chữ của trang nên chính
   xác và tức thì, không cần nhận dạng chữ: các dòng theo thứ tự đọc, một dòng trống giữa các đoạn,
   và giá trị của ô nhập chữ. Chữ bị ẩn, ô mật khẩu và chữ bị cuộn khuất được bỏ qua. Chữ nằm trong
-  ảnh, canvas hoặc iframe thì không đọc được. Nếu vùng không có chữ, clipboard được giữ nguyên.
+  ảnh, canvas hoặc iframe thì không đọc được: hãy dùng **Chữ từ ảnh**. Nếu vùng không có chữ,
+  clipboard được giữ nguyên.
+- **Chữ từ ảnh** nhận dạng chữ trong điểm ảnh của vùng, nên đọc được cả hình, khung hình video,
+  canvas và iframe, rồi sao chép: bấm nút, hoặc nhấn `Shift+T` trên nút `⠿`. Tính năng cũng dùng
+  được với ảnh mở trong trình chỉnh sửa (đọc cả ảnh). Tiếng Anh và tiếng Việt được nhận dạng
+  offline bằng Tesseract đóng gói sẵn trong tiện ích: không tải gì về và ảnh không rời trình duyệt.
+  Việc đọc mất vài giây, và các nét vẽ đánh dấu trên vùng được bỏ qua. Bản Chrome quá cũ sẽ báo
+  không hỗ trợ.
 - Đánh dấu lên vùng đã khoá trước khi chụp: thanh công cụ vẽ **mũi tên** `↗`, **khung** `▢`, hoặc
   **che một vùng** `▒` bằng mosaic; `↶` (hoặc `Ctrl+Z` khi đang cầm công cụ) bỏ nét vẽ gần nhất. Khi
   đã chọn công cụ, kéo trong vùng chọn để vẽ; nhấn `Esc` để bỏ công cụ và trang tương tác lại như
@@ -116,7 +123,8 @@ Sau mỗi lần thay đổi source, bấm **Reload** tại thẻ extension trư�
 3. Dùng các nút tròn để đổi kích thước; kéo nút `⠿` để di chuyển.
 4. Tương tác với trang nếu cần tạo đúng trạng thái muốn chụp.
 5. Bấm **Capture**, nhấn `Enter`, hoặc dùng `Alt+Shift+C`. Muốn lấy chữ thay vì ảnh thì bấm
-   **Copy text** (Sao chép chữ) hoặc nhấn `T`.
+   **Copy text** (Sao chép chữ) hoặc nhấn `T`; muốn đọc chữ trong hình, video hay canvas thì bấm
+   **Text from image** (Chữ từ ảnh) hoặc nhấn `Shift+T`.
 6. Nhấn `Esc` hoặc nút **×** để đóng overlay.
 
 Muốn chụp cả trang thay vì một vùng, chọn **Chụp toàn trang** trong popup hoặc nhấn `Alt+Shift+F`;
@@ -131,6 +139,8 @@ Có thể thay đổi phím tắt tại `chrome://extensions/shortcuts`.
 
 - `activeTab`: chỉ truy cập tab hiện tại sau hành động trực tiếp của người dùng.
 - `scripting`: inject giao diện chọn vùng vào tab đang được kích hoạt.
+- `offscreen`: mở một trang ẩn của tiện ích để chạy bộ nhận dạng chữ đóng gói sẵn khi
+  **Chữ từ ảnh** đọc một vùng, rồi đóng ngay sau đó. Quyền này không hiện cảnh báo khi cài.
 - `storage`: lưu các cài đặt (định dạng ảnh, bo góc, tiền tố tên tệp, thao tác mặc định, hẹn giờ
   chụp, số ảnh chụp liên tiếp và chụp khi thay đổi) trên chính thiết bị này. Không lưu gì khác.
 
