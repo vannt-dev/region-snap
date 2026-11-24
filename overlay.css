@@ -218,14 +218,129 @@
 
 #region-snap-root .region-snap-copy,
 #region-snap-root .region-snap-copy-text,
-#region-snap-root .region-snap-read-text {
+#region-snap-root .region-snap-read-text,
+#region-snap-root .region-snap-read-qr {
   color: #e2e8f0 !important;
   background: #1e293b !important;
 }
 #region-snap-root .region-snap-copy:hover,
 #region-snap-root .region-snap-copy-text:hover,
-#region-snap-root .region-snap-read-text:hover {
+#region-snap-root .region-snap-read-text:hover,
+#region-snap-root .region-snap-read-qr:hover {
   background: #334155 !important;
+}
+
+/* What a QR code holds, shown as plain text; a link shows its host apart before it is opened. */
+#region-snap-root .region-snap-qr {
+  position: fixed !important;
+  top: 16px !important;
+  right: 16px !important;
+  width: min(420px, calc(100vw - 32px)) !important;
+  padding: 12px !important;
+  pointer-events: auto !important;
+  color: #f8fafc !important;
+  background: rgba(15, 23, 42, 0.97) !important;
+  border: 1px solid rgba(148, 163, 184, 0.3) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 10px 30px rgba(2, 6, 23, 0.38) !important;
+  font:
+    500 13px/1.45 Inter,
+    ui-sans-serif,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif !important;
+  text-align: left !important;
+}
+
+#region-snap-root .region-snap-qr-head,
+#region-snap-root .region-snap-qr-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+#region-snap-root .region-snap-qr-head {
+  justify-content: space-between !important;
+}
+
+#region-snap-root .region-snap-qr-actions {
+  justify-content: flex-end !important;
+  margin-top: 10px !important;
+}
+
+#region-snap-root .region-snap-qr-host,
+#region-snap-root .region-snap-qr-text {
+  margin: 8px 0 0 !important;
+  padding: 0 !important;
+  color: #e2e8f0 !important;
+  font: inherit !important;
+}
+
+#region-snap-root .region-snap-qr-host b {
+  color: #ffffff !important;
+  font-weight: 700 !important;
+}
+
+#region-snap-root .region-snap-qr-text {
+  max-height: 160px !important;
+  overflow: auto !important;
+  padding: 8px !important;
+  background: #0b1220 !important;
+  border-radius: 7px !important;
+  font:
+    500 12px/1.45 ui-monospace,
+    SFMono-Regular,
+    Consolas,
+    monospace !important;
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere !important;
+  user-select: text !important;
+}
+
+#region-snap-root .region-snap-qr button {
+  all: initial !important;
+  height: 28px !important;
+  padding: 0 10px !important;
+  border-radius: 7px !important;
+  color: #e2e8f0 !important;
+  background: #1e293b !important;
+  font:
+    600 12px/28px Inter,
+    ui-sans-serif,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif !important;
+  text-align: center !important;
+  cursor: pointer !important;
+  user-select: none !important;
+}
+
+#region-snap-root .region-snap-qr button:hover {
+  background: #334155 !important;
+}
+
+#region-snap-root .region-snap-qr button:focus-visible {
+  outline: 2px solid #93c5fd !important;
+  outline-offset: 2px !important;
+}
+
+#region-snap-root .region-snap-qr .region-snap-qr-open {
+  color: #ffffff !important;
+  background: var(--rs-primary) !important;
+}
+
+#region-snap-root .region-snap-qr .region-snap-qr-open:hover {
+  background: var(--rs-primary-hover) !important;
+}
+
+#region-snap-root .region-snap-qr .region-snap-qr-close {
+  width: 28px !important;
+  padding: 0 !important;
+  color: #cbd5e1 !important;
+  background: transparent !important;
+  font-size: 18px !important;
 }
 
 /* The hidden field Copy text writes through when the page has no async clipboard. */

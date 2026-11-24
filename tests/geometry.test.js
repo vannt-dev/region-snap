@@ -352,3 +352,63 @@ test("tidies text like the desktop app and counts no lines when empty", () => {
   assert.deepEqual(geometry.regionText([]), { text: "", lineCount: 0 });
   assert.deepEqual(geometry.regionText([word("   ", 0, 0)]), { text: "", lineCount: 0 });
 });
+
+test("a remembered region keeps its place on the page and is found again after scrolling", () => {
+  const region = geometry.rememberRegion(
+    { left: 100, top: 50, width: 300, height: 200 },
+    { left: 0, top: 400 },
+  );
+  assert.deepEqual(region, {
+    left: 100,
+    top: 450,
+    width: 300,
+    height: 200,
+    scrollLeft: 0,
+    scrollTop: 400,
+  });
+  // Scrolled back to where it was taken, the region is where it was in the window.
+  assert.deepEqual(geometry.regionInView(region, { left: 0, top: 400 }, viewport), {
+    left: 100,
+    top: 50,
+    width: 300,
+    height: 200,
+  });
+  // Scrolled a little further, the page moved up and the region with it.
+  assert.deepEqual(geometry.regionInView(region, { left: 0, top: 420 }, viewport), {
+    left: 100,
+    top: 30,
+    width: 300,
+    height: 200,
+  });
+});
+
+test("a remembered region only part of which the window shows is not captured", () => {
+  const region = geometry.rememberRegion(
+    { left: 100, top: 50, width: 300, height: 200 },
+    { left: 0, top: 400 },
+  );
+  assert.equal(
+    geometry.regionInView(region, { left: 0, top: 0 }, { width: 1000, height: 600 }),
+    null,
+  );
+  assert.equal(geometry.regionInView(region, { left: 0, top: 480 }, viewport), null);
+  assert.equal(
+    geometry.regionInView(region, { left: 0, top: 400 }, { width: 350, height: 700 }),
+    null,
+  );
+  // Half a pixel of rounding at an edge is not a missing part.
+  assert.ok(geometry.regionInView(region, { left: 0, top: 450.4 }, viewport));
+});
+
+test("a region that is not a box of numbers is not remembered", () => {
+  assert.equal(geometry.rememberRegion(null, { left: 0, top: 0 }), null);
+  assert.equal(
+    geometry.rememberRegion({ left: 0, top: 0, width: 0, height: 10 }, { left: 0, top: 0 }),
+    null,
+  );
+  assert.equal(
+    geometry.rememberRegion({ left: "x", top: 0, width: 9, height: 9 }, { left: 0, top: 0 }),
+    null,
+  );
+  assert.equal(geometry.regionInView({ left: 1 }, { left: 0, top: 0 }, viewport), null);
+});

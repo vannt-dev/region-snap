@@ -29,6 +29,7 @@ test("all extension entry files exist", () => {
     "ocr.html",
     "ocr-offscreen.js",
     "ocr-text.js",
+    "qr-code.js",
     "overlay.css",
     "popup.js",
     "popup.css",

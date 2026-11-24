@@ -6,6 +6,8 @@ const primaryShortcut = document.getElementById("primary-shortcut");
 const secondaryShortcut = document.getElementById("secondary-shortcut");
 const fullPageButton = document.getElementById("full-page-action");
 const fullPageShortcut = document.getElementById("full-page-shortcut");
+const recaptureButton = document.getElementById("recapture-action");
+const recaptureShortcut = document.getElementById("recapture-shortcut");
 const stateLabel = document.getElementById("state-label");
 const stateDetail = document.getElementById("state-detail");
 const errorMessage = document.getElementById("error-message");
@@ -30,6 +32,7 @@ function setBusy(busy) {
   primaryButton.disabled = busy || document.body.dataset.state === "unsupported";
   secondaryButton.disabled = busy;
   fullPageButton.disabled = busy || document.body.dataset.state === "unsupported";
+  recaptureButton.disabled = busy;
 }
 
 function showError(message) {
@@ -47,6 +50,8 @@ function setStatus(status) {
   document.body.dataset.state = state;
   document.body.classList.remove("is-loading");
   showError("");
+  // Shown once this tab has captured a region, which it can then capture again.
+  recaptureButton.hidden = state === STATE.UNSUPPORTED || !status?.hasLastRegion;
 
   if (state === STATE.LOCKED) {
     const width = Math.round(status.rect?.width || 0);
@@ -108,6 +113,7 @@ async function loadShortcuts() {
     };
     showShortcut(secondaryShortcut, shortcuts["toggle-picker"]);
     showShortcut(fullPageShortcut, shortcuts["capture-full-page"]);
+    showShortcut(recaptureShortcut, shortcuts["recapture-region"]);
     showShortcut(
       primaryShortcut,
       primaryCommand === MESSAGE.DO_CAPTURE
@@ -131,6 +137,7 @@ async function loadStatus() {
 primaryButton.addEventListener("click", () => runCommand(primaryCommand));
 secondaryButton.addEventListener("click", () => runCommand(MESSAGE.START_PICKING));
 fullPageButton.addEventListener("click", () => runCommand(MESSAGE.CAPTURE_FULL_PAGE));
+recaptureButton.addEventListener("click", () => runCommand(MESSAGE.RECAPTURE_REGION));
 // Works on any tab, a page the overlay cannot reach included: the image opens in a tab of its own.
 document.getElementById("open-editor").addEventListener("click", async () => {
   await chrome.tabs.create({ url: chrome.runtime.getURL("editor.html") });

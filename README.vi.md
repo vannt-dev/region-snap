@@ -29,6 +29,12 @@ bản nào không có ở đó thì không phải do vannt-dev phát hành.
   offline bằng Tesseract đóng gói sẵn trong tiện ích: không tải gì về và ảnh không rời trình duyệt.
   Việc đọc mất vài giây, và các nét vẽ đánh dấu trên vùng được bỏ qua. Bản Chrome quá cũ sẽ báo
   không hỗ trợ.
+- **Mã QR** đọc mã QR trong điểm ảnh của vùng: bấm nút, hoặc nhấn `Q` trên nút `⠿`. Một khung
+  hiện nội dung của mã dưới dạng chữ thuần, kèm nút **Sao chép**. Nếu đó là địa chỉ web (`http`
+  hoặc `https`), khung hiện đủ địa chỉ và tên máy chủ in đậm, và nút **Mở liên kết** mở nó trong
+  tab mới. Không có gì được sao chép hay mở cho tới khi bạn bấm. Mã được giải bằng jsQR đóng gói
+  sẵn trong tiện ích: không tải gì về và ảnh không rời trình duyệt. Tính năng cũng dùng được với
+  ảnh mở trong trình chỉnh sửa. Chỉ đọc mã QR, không đọc các loại mã vạch khác.
 - Đánh dấu lên vùng đã khoá trước khi chụp: thanh công cụ vẽ **mũi tên** `↗`, **khung** `▢`, hoặc
   **che một vùng** `▒` bằng mosaic; `↶` (hoặc `Ctrl+Z` khi đang cầm công cụ) bỏ nét vẽ gần nhất. Khi
   đã chọn công cụ, kéo trong vùng chọn để vẽ; nhấn `Esc` để bỏ công cụ và trang tương tác lại như
@@ -56,6 +62,13 @@ bản nào không có ở đó thì không phải do vannt-dev phát hành.
   lát thành một ảnh, không kèm thanh cuộn. Header cố định chỉ nằm ở lát đầu và footer cố định chỉ
   nằm ở lát cuối thay vì lặp lại suốt ảnh; phần tử sticky nằm đúng vị trí trong luồng. Chụp xong
   trang được cuộn về chỗ cũ, và `Esc` dừng việc chụp.
+- **Chụp lại vùng vừa chụp** (popup, hoặc `Alt+Shift+L`) chụp lại vùng mà tab này chụp gần nhất,
+  không cần chọn lại, theo định dạng, bo góc và thao tác mặc định trong cài đặt (không hẹn giờ,
+  không kèm nét đánh dấu của lần chụp trước). Vùng giữ đúng vị trí trên trang: nếu trang đã cuộn
+  khiến cửa sổ không còn thấy trọn vùng, trang được cuộn tới vùng để chụp rồi trả về chỗ cũ. Vùng
+  được nhớ cho từng tab tới khi đóng tab hoặc thoát trình duyệt, nên vẫn còn sau khi tải lại
+  trang. Nếu cửa sổ đã quá nhỏ, hoặc trang quá ngắn, để hiện trọn vùng, tiện ích báo lỗi và không
+  lưu gì.
 - **Chụp vùng cuộn** `⇣` (thanh công cụ) chụp toàn bộ nội dung của một khung tự cuộn khi vùng
   đã khóa nằm trong đó (luồng chat, danh sách thư, khung bên), hoặc một phần tử cao hơn cửa sổ.
   Extension cuộn từng khung một rồi ghép các lát, giữ đúng các cột của vùng chọn và toàn bộ
@@ -124,11 +137,13 @@ Sau mỗi lần thay đổi source, bấm **Reload** tại thẻ extension trư�
 4. Tương tác với trang nếu cần tạo đúng trạng thái muốn chụp.
 5. Bấm **Capture**, nhấn `Enter`, hoặc dùng `Alt+Shift+C`. Muốn lấy chữ thay vì ảnh thì bấm
    **Copy text** (Sao chép chữ) hoặc nhấn `T`; muốn đọc chữ trong hình, video hay canvas thì bấm
-   **Text from image** (Chữ từ ảnh) hoặc nhấn `Shift+T`.
+   **Text from image** (Chữ từ ảnh) hoặc nhấn `Shift+T`; muốn đọc mã QR thì bấm **QR code**
+   (Mã QR) hoặc nhấn `Q`.
 6. Nhấn `Esc` hoặc nút **×** để đóng overlay.
 
 Muốn chụp cả trang thay vì một vùng, chọn **Chụp toàn trang** trong popup hoặc nhấn `Alt+Shift+F`;
-ảnh dùng định dạng và hành động mặc định trong cài đặt.
+ảnh dùng định dạng và hành động mặc định trong cài đặt. Muốn chụp lại vùng vừa chụp trong tab
+này, nhấn `Alt+Shift+L` hoặc chọn **Chụp lại vùng vừa chụp** trong popup.
 
 Muốn đánh dấu một ảnh chụp hay hình có sẵn, chọn **Mở hoặc dán một ảnh** trong popup, rồi mở
 tệp, nhấn `Ctrl+V` hoặc kéo thả ảnh vào trang.
@@ -142,7 +157,9 @@ Có thể thay đổi phím tắt tại `chrome://extensions/shortcuts`.
 - `offscreen`: mở một trang ẩn của tiện ích để chạy bộ nhận dạng chữ đóng gói sẵn khi
   **Chữ từ ảnh** đọc một vùng, rồi đóng ngay sau đó. Quyền này không hiện cảnh báo khi cài.
 - `storage`: lưu các cài đặt (định dạng ảnh, bo góc, tiền tố tên tệp, thao tác mặc định, hẹn giờ
-  chụp, số ảnh chụp liên tiếp và chụp khi thay đổi) trên chính thiết bị này. Không lưu gì khác.
+  chụp, số ảnh chụp liên tiếp và chụp khi thay đổi) trên chính thiết bị này. Khi trình duyệt
+  đang chạy, nó còn giữ vị trí và kích thước của vùng chụp gần nhất ở mỗi tab (không có địa chỉ
+  trang, không có ảnh) cho **Chụp lại vùng vừa chụp**. Không lưu gì khác.
 
 Extension xử lý ảnh ngay trong trình duyệt và không gửi ảnh ra máy chủ.
 
