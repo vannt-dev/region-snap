@@ -128,8 +128,9 @@
   };
   // A press that travels less than this is a click on a note, not a drag of it.
   const CLICK_SLOP = 3;
-  // About the widest the toolbar gets: with a tool held it also shows the mark colours.
-  const TOOLBAR_WIDTH = 1010;
+  // About the widest the toolbar gets: with a tool held it also shows the mark colours
+  // (measured at 1116 px in Chromium on Windows).
+  const TOOLBAR_WIDTH = 1120;
   // Capture on change waits for the region to be still this long, but never longer than the
   // second value after the first change, so content that never settles is still captured.
   const WATCH_QUIET_MS = 400;

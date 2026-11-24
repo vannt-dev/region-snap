@@ -1630,6 +1630,27 @@ try {
   for (const line of OCR_LINES) assert.match(editorText, line);
   assert.equal(editorDownloads, 0, "Text from image saves no image");
 
+  // QR code reads an opened image too, through the real runtime messaging, and its link opens
+  // in a new tab from the real service worker.
+  await editor.locator("#file-input").setInputFiles({
+    name: "qr.png",
+    mimeType: "image/png",
+    buffer: await QRCode.toBuffer(qrLink, { margin: 4, scale: 5 }),
+  });
+  await editor.locator(".region-snap-read-qr").click();
+  const editorQr = editor.locator(".region-snap-qr");
+  await editorQr.waitFor({ timeout: 30_000 });
+  assert.equal(await editorQr.locator(".region-snap-qr-text").textContent(), qrLink);
+  const editorOpened = context.waitForEvent("page");
+  await editorQr.locator(".region-snap-qr-open").click();
+  const editorLinkPage = await editorOpened;
+  await editorLinkPage.waitForLoadState();
+  assert.equal(editorLinkPage.url(), qrLink);
+  await editorLinkPage.close();
+  await editor.keyboard.press("Escape");
+  await editorQr.waitFor({ state: "detached" });
+  assert.equal(editorDownloads, 0, "QR code saves no image");
+
   // Esc puts the tool down, the next one closes the image and goes back to the start screen.
   await editor.locator('.region-snap-tool[data-tool="arrow"]').click();
   await editor.keyboard.press("Escape");
