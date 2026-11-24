@@ -5,7 +5,7 @@
   "description": "__MSG_extensionDescription__",
   "default_locale": "en",
   "homepage_url": "https://github.com/vannt-dev/region-snap",
-  "minimum_chrome_version": "102",
+  "minimum_chrome_version": "113",
   "permissions": ["activeTab", "offscreen", "scripting", "storage"],
   "commands": {
     "toggle-picker": {
