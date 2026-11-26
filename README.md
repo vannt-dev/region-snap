@@ -135,6 +135,11 @@ flowchart TB
 - **Copy text** (toolbar button or `T` while selecting) reads the text in the region and puts it on
   the clipboard. English and Vietnamese are recognised fully offline: the Tesseract engine and both
   language models ship inside the app, and nothing is sent over the network.
+- **Pin** (toolbar button or `P` while selecting) keeps the capture on screen in a small
+  always-on-top window over the region: drag it anywhere, scroll to zoom, `Ctrl`+scroll to change
+  its opacity, and right-click to copy or save it. Pin as many captures as you like; `Esc`, a
+  double-click or the × button closes one. The tray menu can pin the last capture again, with an
+  optional shortcut set in Settings.
 - Supports English and Vietnamese UI, keyboard movement/resizing, and optional startup with Windows.
 
 Download `Region-Snap-Setup-<version>.exe` from the

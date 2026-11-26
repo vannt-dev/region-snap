@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; img-src data:; style-src 'self'; script-src 'self'"
+    />
+    <title>Region Snap</title>
+    <link rel="stylesheet" href="pin.css" />
+  </head>
+  <body data-title-key="pinTitle">
+    <img id="image" alt="" draggable="false" />
+    <button id="close" title="Đóng (Esc hoặc nhấp đúp)" data-i18n-title="pinClose">×</button>
+    <div id="notice" role="status" aria-live="polite"></div>
+    <script src="i18n.js"></script>
+    <script src="pin.js"></script>
+  </body>
+</html>

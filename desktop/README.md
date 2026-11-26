@@ -18,7 +18,23 @@ selection. Recognition runs on your device with Tesseract (WebAssembly) and the 
 Vietnamese models bundled in the app. Nothing is downloaded or uploaded; on first use the two models
 (about 4.4 MB) are copied to `ocr-languages` in the app data folder.
 
-Open **Cài đặt…** from the tray menu to change the shortcut, output directory, clipboard behavior, or Windows login startup.
+To keep a capture on screen while you work, select the region and press **Pin** or `P`. The
+capture opens in a small frameless window that stays on top of other windows, exactly over the
+region you selected:
+
+- Drag it to move it.
+- Scroll to zoom (around the pointer); `Ctrl`+scroll changes its opacity. `Ctrl+0` returns to the
+  actual size.
+- Right-click for **Copy**, **Save** (to the screenshot folder), **Save as…**, opacity presets,
+  **Actual size**, **Close** and **Close all pins**. `Ctrl+C`, `Ctrl+S` and `Ctrl+Shift+S` do the
+  same from the keyboard.
+- `Esc`, a double-click or the × button in the corner closes the pin.
+
+Several pins can be open at once. The tray menu has **Pin last capture** (the last saved or pinned
+capture, at the place it was taken) and **Close all pins**. In Settings you can give **Pin last
+capture** its own global shortcut, such as `Alt+Shift+P`; it is off until you set one.
+
+Open **Cài đặt…** from the tray menu to change the shortcuts, output directory, clipboard behavior, or Windows login startup.
 
 ## Package for Windows
 
@@ -38,6 +54,7 @@ The NSIS installer is written to `release/`.
 - Crops each display before transferring image data to keep multi-monitor memory use bounded
 - Configurable PNG output directory and clipboard copy
 - Offline Copy text (OCR) for English and Vietnamese, from the toolbar or `T`
+- Pin captures as always-on-top windows with zoom, opacity, copy and save, from the toolbar or `P`
 - Optional startup with Windows in packaged builds
 - Vietnamese and English desktop UI based on the Windows locale
 - Success notification containing the saved file path

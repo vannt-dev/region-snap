@@ -1,0 +1,85 @@
+/*! SPDX-License-Identifier: MIT | Copyright (c) 2026 vannt-dev | github.com/vannt-dev/region-snap */
+:root {
+  color-scheme: dark;
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  user-select: none;
+  background: #000;
+}
+body {
+  cursor: move;
+}
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  border: 1px solid rgb(97 218 251 / 55%);
+  pointer-events: none;
+}
+#image {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+}
+#close {
+  position: fixed;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: #eef6ff;
+  background: rgb(20 24 33 / 82%);
+  font: inherit;
+  font-size: 15px;
+  line-height: 22px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+body:hover #close,
+#close:focus-visible {
+  opacity: 1;
+}
+#close:hover {
+  background: #d9485f;
+}
+#notice {
+  position: fixed;
+  left: 4px;
+  bottom: 4px;
+  max-width: calc(100% - 8px);
+  padding: 3px 7px;
+  border-radius: 6px;
+  color: #e8f2ff;
+  background: rgb(16 20 28 / 88%);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+#notice.visible {
+  opacity: 1;
+}

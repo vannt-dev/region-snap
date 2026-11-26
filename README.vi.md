@@ -101,6 +101,7 @@ bản nào không có ở đó thì không phải do vannt-dev phát hành.
 - Ẩn overlay rồi lấy frame mới, phù hợp với video và nội dung động.
 - Lưu PNG cục bộ và có thể copy trực tiếp vào clipboard.
 - **Sao chép chữ** (nút trên thanh công cụ hoặc phím `T` khi đang chọn vùng) nhận dạng chữ trong vùng và đưa vào clipboard. Nhận dạng tiếng Anh và tiếng Việt hoàn toàn offline: engine Tesseract và hai bộ dữ liệu ngôn ngữ nằm sẵn trong ứng dụng, không gửi gì qua mạng.
+- **Ghim** (nút trên thanh công cụ hoặc phím `P` khi đang chọn vùng) giữ ảnh chụp trên màn hình trong một cửa sổ nhỏ luôn nổi trên cùng, ngay tại vùng đã chụp: kéo đi bất cứ đâu, cuộn chuột để phóng to/thu nhỏ, `Ctrl`+cuộn để đổi độ mờ, nhấp chuột phải để sao chép hoặc lưu. Ghim bao nhiêu ảnh cũng được; `Esc`, nhấp đúp hoặc nút × đóng từng ảnh. Menu tray có thể ghim lại ảnh vừa chụp, kèm phím tắt tùy chọn trong Cài đặt.
 - Hỗ trợ giao diện tiếng Việt/Anh, di chuyển–resize bằng bàn phím và tùy chọn khởi động cùng Windows.
 
 Tải `Region-Snap-Setup-<version>.exe` từ [bản phát hành mới nhất](https://github.com/vannt-dev/region-snap/releases/latest). Bộ cài chưa được ký số nên Windows SmartScreen sẽ hỏi trước: chọn **Thông tin thêm**, rồi **Vẫn chạy**.
