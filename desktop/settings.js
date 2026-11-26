@@ -4,6 +4,7 @@
   const { translate } = globalThis.RegionSnapI18n;
   const form = document.getElementById("settings-form");
   const shortcut = document.getElementById("shortcut");
+  const pinShortcut = document.getElementById("pin-shortcut");
   const outputDirectory = document.getElementById("output-directory");
   const copyToClipboard = document.getElementById("copy-to-clipboard");
   const openAtLogin = document.getElementById("open-at-login");
@@ -18,6 +19,7 @@
 
   function render(settings) {
     shortcut.value = settings.shortcut;
+    pinShortcut.value = settings.pinShortcut;
     outputDirectory.value = settings.outputDirectory;
     copyToClipboard.checked = settings.copyToClipboard;
     openAtLogin.checked = settings.openAtLogin;
@@ -35,6 +37,7 @@
     try {
       const saved = await api.save({
         shortcut: shortcut.value,
+        pinShortcut: pinShortcut.value,
         outputDirectory: outputDirectory.value,
         copyToClipboard: copyToClipboard.checked,
         openAtLogin: openAtLogin.checked,

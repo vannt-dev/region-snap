@@ -3,6 +3,7 @@ const {
   app,
   BrowserWindow,
   clipboard,
+  ClipboardItem,
   desktopCapturer,
   dialog,
   globalShortcut,
@@ -24,9 +25,20 @@ const {
   validateSelection,
 } = require("./capture-utils.cjs");
 const { copyTextFromImage, createTesseractRecognizer, ocrScale } = require("./ocr.cjs");
+const {
+  clampOpacity,
+  dragBounds,
+  initialPinBounds,
+  keepOnScreen,
+  nextOpacity,
+  nextScale,
+  sameAccelerator,
+  scaledBounds,
+} = require("./pin-utils.cjs");
 
 const DEFAULT_SETTINGS = Object.freeze({
   shortcut: "Alt+Shift+S",
+  pinShortcut: "",
   outputDirectory: "",
   copyToClipboard: true,
   openAtLogin: false,
@@ -45,6 +57,19 @@ const MAIN_COPY = Object.freeze({
     chooseFolder: "Choose screenshot folder",
     textCopiedOne: "Copied 1 line of text",
     textCopied: "Copied {count} lines of text",
+    pinLast: "Pin last capture",
+    closePins: "Close all pins",
+    noLastCapture: "There is no capture to pin yet.",
+    pinCopy: "Copy",
+    pinSave: "Save",
+    pinSaveAs: "Save as…",
+    pinOpacity: "Opacity",
+    pinActualSize: "Actual size",
+    pinClose: "Close",
+    pinCopied: "Copied",
+    pinSaved: "Saved",
+    sameShortcut: "The capture and pin shortcuts must be different.",
+    pinShortcutDisabled: "The pin shortcut was turned off.",
   },
   vi: {
     capture: "Chụp vùng",
@@ -56,9 +81,25 @@ const MAIN_COPY = Object.freeze({
     chooseFolder: "Chọn thư mục lưu ảnh",
     textCopiedOne: "Đã sao chép 1 dòng chữ",
     textCopied: "Đã sao chép {count} dòng chữ",
+    pinLast: "Ghim ảnh vừa chụp",
+    closePins: "Đóng mọi ảnh ghim",
+    noLastCapture: "Chưa có ảnh nào để ghim.",
+    pinCopy: "Sao chép",
+    pinSave: "Lưu",
+    pinSaveAs: "Lưu thành…",
+    pinOpacity: "Độ mờ",
+    pinActualSize: "Kích thước gốc",
+    pinClose: "Đóng",
+    pinCopied: "Đã sao chép",
+    pinSaved: "Đã lưu",
+    sameShortcut: "Phím tắt chụp và phím tắt ghim phải khác nhau.",
+    pinShortcutDisabled: "Đã tắt phím tắt ghim ảnh.",
   },
 });
+const PIN_OPACITY_PRESETS = Object.freeze([1, 0.8, 0.6, 0.4]);
 const overlayWindows = new Map();
+const pinWindows = new Map();
+let lastCapture = null;
 let tray = null;
 let settingsWindow = null;
 let settings = { ...DEFAULT_SETTINGS };
@@ -90,6 +131,7 @@ function sanitizeSettings(candidate = {}) {
       typeof candidate.shortcut === "string" && candidate.shortcut.trim()
         ? candidate.shortcut.trim()
         : DEFAULT_SETTINGS.shortcut,
+    pinShortcut: typeof candidate.pinShortcut === "string" ? candidate.pinShortcut.trim() : "",
     outputDirectory:
       typeof candidate.outputDirectory === "string" ? candidate.outputDirectory.trim() : "",
     copyToClipboard: candidate.copyToClipboard !== false,
@@ -118,10 +160,30 @@ function applyLoginSetting() {
   }
 }
 
-function registerCaptureShortcut(accelerator = settings.shortcut) {
-  globalShortcut.unregisterAll();
-  const registered = globalShortcut.register(accelerator, () => startCapture().catch(showError));
+function registerShortcut(accelerator, callback) {
+  let registered;
+  try {
+    registered = globalShortcut.register(accelerator, callback);
+  } catch {
+    // An accelerator Electron cannot parse is reported like one that is taken.
+  }
   if (!registered) throw new Error(`Không thể đăng ký phím tắt ${accelerator}.`);
+}
+
+// Registers the capture shortcut and, when set, the pin shortcut. Either both are registered or
+// the error is thrown with none left registered.
+function registerShortcuts({ shortcut, pinShortcut } = settings) {
+  if (pinShortcut && sameAccelerator(shortcut, pinShortcut)) {
+    throw new Error(mainCopy("sameShortcut"));
+  }
+  globalShortcut.unregisterAll();
+  try {
+    registerShortcut(shortcut, () => startCapture().catch(showError));
+    if (pinShortcut) registerShortcut(pinShortcut, pinLastCapture);
+  } catch (error) {
+    globalShortcut.unregisterAll();
+    throw error;
+  }
 }
 
 function timestamp() {
@@ -230,6 +292,7 @@ async function captureSources(event, payload) {
   if (!sameDisplayLayout(state.layout, currentLayout)) {
     throw new Error("Cấu hình màn hình đã thay đổi. Hãy chọn vùng lại.");
   }
+  state.selection = selection.rect;
 
   captureInProgress = true;
   setOverlaysVisible(false);
@@ -289,6 +352,16 @@ async function captureSources(event, payload) {
   }
 }
 
+// Electron 45 replaced clipboard.writeImage with the asynchronous ClipboardItem API.
+async function writeClipboardImage(image) {
+  if (typeof clipboard.writeImage === "function") {
+    clipboard.writeImage(image);
+    return;
+  }
+  const png = new Blob([image.toPNG()], { type: "image/png" });
+  await clipboard.write([new ClipboardItem({ "image/png": png })]);
+}
+
 function mostlyBlack(image) {
   const bitmap = image.toBitmap();
   const pixelCount = bitmap.length / 4;
@@ -322,6 +395,13 @@ function assertCaptureRequest(event) {
   if (!owner || !overlayWindows.has(owner) || !captureInProgress) {
     throw new Error("Yêu cầu lưu ảnh không hợp lệ.");
   }
+  return overlayWindows.get(owner);
+}
+
+function rememberCapture(image, state) {
+  if (!state?.selection) return;
+  lastCapture = { image, bounds: initialPinBounds(state.selection, state.virtualBounds) };
+  createTrayMenu();
 }
 
 function decodeCapture(dataUrl) {
@@ -338,14 +418,15 @@ function decodeCapture(dataUrl) {
 }
 
 async function saveCapture(event, dataUrl) {
-  assertCaptureRequest(event);
+  const state = assertCaptureRequest(event);
   try {
     const image = decodeCapture(dataUrl);
     const directory = outputDirectory();
     await fs.mkdir(directory, { recursive: true });
     const outputPath = await uniqueOutputPath(directory);
     await fs.writeFile(outputPath, image.toPNG(), { flag: "wx" });
-    if (settings.copyToClipboard) clipboard.writeImage(image);
+    if (settings.copyToClipboard) await writeClipboardImage(image);
+    rememberCapture(image, state);
     const protectedWarning = mostlyBlack(image);
     closeOverlays();
     showCaptureSuccess(outputPath);
@@ -405,6 +486,189 @@ async function copyCaptureText(event, dataUrl) {
   }
 }
 
+async function pinCapture(event, dataUrl) {
+  const state = assertCaptureRequest(event);
+  try {
+    const image = decodeCapture(dataUrl);
+    if (!state.selection) throw new Error("Yêu cầu ghim ảnh không hợp lệ.");
+    const bounds = initialPinBounds(state.selection, state.virtualBounds);
+    closeOverlays();
+    await createPin(image, bounds);
+    rememberCapture(image, state);
+    return { pinned: true };
+  } catch (error) {
+    // Once the overlay is gone nothing shows the error, so the tray does.
+    if (overlayWindows.size) setOverlaysVisible(true);
+    else showError(error);
+    throw error;
+  } finally {
+    captureInProgress = false;
+  }
+}
+
+// Shows `image` in a small always-on-top window at `requestedBounds` (logical screen pixels). The
+// image stays in the main process; the pin page only displays it and asks for actions on itself.
+async function createPin(image, requestedBounds) {
+  const display = screen.getDisplayMatching(requestedBounds);
+  const bounds = keepOnScreen(requestedBounds, display.bounds);
+  const pin = new BrowserWindow({
+    ...bounds,
+    title: "Region Snap",
+    frame: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    maximizable: false,
+    minimizable: false,
+    fullscreenable: false,
+    thickFrame: false,
+    hasShadow: true,
+    backgroundColor: "#000000",
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, "pin-preload.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+  hardenWindow(pin);
+  pin.setAlwaysOnTop(true, "floating");
+  pinWindows.set(pin, {
+    image,
+    baseSize: { width: bounds.width, height: bounds.height },
+    bounds,
+    scale: 1,
+    opacity: 1,
+    drag: null,
+  });
+  pin.on("closed", () => {
+    pinWindows.delete(pin);
+    createTrayMenu();
+  });
+  createTrayMenu();
+  await pin.loadFile(path.join(__dirname, "pin.html"), { query: { lang: uiLocale() } });
+  if (pin.isDestroyed()) return;
+  pin.setBounds(bounds, false);
+  pin.show();
+}
+
+async function pinLastCapture() {
+  if (!lastCapture) {
+    showNotice(mainCopy("noLastCapture"));
+    return;
+  }
+  await createPin(lastCapture.image, lastCapture.bounds).catch(showError);
+}
+
+function closePins() {
+  for (const pin of pinWindows.keys()) if (!pin.isDestroyed()) pin.destroy();
+  pinWindows.clear();
+  createTrayMenu();
+}
+
+// The pin that sent an IPC message, or null for any other sender: a pin acts only on itself.
+function pinFromEvent(event) {
+  const pin = BrowserWindow.fromWebContents(event.sender);
+  const state = pin && pinWindows.get(pin);
+  return state && !pin.isDestroyed() ? { pin, state } : null;
+}
+
+function setPinBounds(pin, state, bounds) {
+  state.bounds = bounds;
+  pin.setBounds(bounds, false);
+}
+
+function pinNotice(pin, message) {
+  if (!pin.isDestroyed()) pin.webContents.send("pin-notice", message);
+}
+
+function zoomPin(pin, state, scale, anchor) {
+  state.scale = scale;
+  setPinBounds(pin, state, scaledBounds(state.bounds, state.baseSize, scale, anchor));
+  pinNotice(pin, `${Math.round(scale * 100)}%`);
+}
+
+function setPinOpacity(pin, state, opacity) {
+  state.opacity = clampOpacity(opacity);
+  pin.setOpacity(state.opacity);
+  pinNotice(pin, `${Math.round(state.opacity * 100)}%`);
+}
+
+async function copyPin(pin, state) {
+  await writeClipboardImage(state.image);
+  pinNotice(pin, mainCopy("pinCopied"));
+}
+
+async function savePin(pin, state) {
+  const directory = outputDirectory();
+  await fs.mkdir(directory, { recursive: true });
+  const outputPath = await uniqueOutputPath(directory);
+  await fs.writeFile(outputPath, state.image.toPNG(), { flag: "wx" });
+  pinNotice(pin, mainCopy("pinSaved"));
+  showCaptureSuccess(outputPath);
+}
+
+async function savePinAs(pin, state) {
+  const result = await dialog.showSaveDialog(pin, {
+    defaultPath: path.join(outputDirectory(), `region-snap-${timestamp()}.png`),
+    filters: [{ name: "PNG", extensions: ["png"] }],
+  });
+  if (result.canceled || !result.filePath) return;
+  const outputPath = /\.png$/i.test(result.filePath) ? result.filePath : `${result.filePath}.png`;
+  await fs.writeFile(outputPath, state.image.toPNG());
+  pinNotice(pin, mainCopy("pinSaved"));
+  showCaptureSuccess(outputPath);
+}
+
+function showPinMenu(pin, state) {
+  Menu.buildFromTemplate([
+    {
+      label: mainCopy("pinCopy"),
+      accelerator: "CommandOrControl+C",
+      click: () => copyPin(pin, state).catch(showError),
+    },
+    {
+      label: mainCopy("pinSave"),
+      accelerator: "CommandOrControl+S",
+      click: () => savePin(pin, state).catch(showError),
+    },
+    {
+      label: mainCopy("pinSaveAs"),
+      accelerator: "CommandOrControl+Shift+S",
+      click: () => savePinAs(pin, state).catch(showError),
+    },
+    { type: "separator" },
+    {
+      label: mainCopy("pinOpacity"),
+      submenu: PIN_OPACITY_PRESETS.map((opacity) => ({
+        label: `${Math.round(opacity * 100)}%`,
+        type: "radio",
+        checked: Math.abs(state.opacity - opacity) < 0.005,
+        click: () => setPinOpacity(pin, state, opacity),
+      })),
+    },
+    {
+      label: mainCopy("pinActualSize"),
+      accelerator: "CommandOrControl+0",
+      enabled: state.scale !== 1,
+      click: () => zoomPin(pin, state, 1),
+    },
+    { type: "separator" },
+    { label: mainCopy("pinClose"), accelerator: "Esc", click: () => pin.close() },
+    { label: mainCopy("closePins"), click: closePins },
+  ]).popup({ window: pin });
+}
+
+// Wraps a pin IPC handler so it runs only for a live pin window, on that pin's own state.
+const forPin =
+  (handler) =>
+  (event, ...args) => {
+    const target = pinFromEvent(event);
+    if (!target) return undefined;
+    return handler(target.pin, target.state, ...args);
+  };
+
 function restoreCapture(event) {
   const owner = BrowserWindow.fromWebContents(event.sender);
   if (owner && overlayWindows.has(owner)) setOverlaysVisible(true);
@@ -419,6 +683,15 @@ function createTrayMenu() {
         label: `${mainCopy("capture")} (${settings.shortcut})`,
         click: () => startCapture().catch(showError),
       },
+      {
+        label: settings.pinShortcut
+          ? `${mainCopy("pinLast")} (${settings.pinShortcut})`
+          : mainCopy("pinLast"),
+        enabled: Boolean(lastCapture),
+        click: pinLastCapture,
+      },
+      { label: mainCopy("closePins"), enabled: pinWindows.size > 0, click: closePins },
+      { type: "separator" },
       { label: mainCopy("settings"), click: openSettingsWindow },
       { type: "separator" },
       {
@@ -456,9 +729,9 @@ function openSettingsWindow() {
   }
   settingsWindow = new BrowserWindow({
     width: 560,
-    height: 570,
+    height: 740,
     minWidth: 520,
-    minHeight: 530,
+    minHeight: 700,
     title: "Cài đặt Region Snap",
     autoHideMenuBar: true,
     backgroundColor: "#0e131b",
@@ -479,18 +752,23 @@ function openSettingsWindow() {
 async function saveSettings(_event, candidate) {
   const previous = settings;
   const next = sanitizeSettings(candidate);
-  if (next.shortcut !== previous.shortcut) {
+  const shortcutsChanged =
+    next.shortcut !== previous.shortcut || next.pinShortcut !== previous.pinShortcut;
+  if (next.pinShortcut && sameAccelerator(next.shortcut, next.pinShortcut)) {
+    throw new Error(mainCopy("sameShortcut"));
+  }
+  if (shortcutsChanged) {
     try {
-      registerCaptureShortcut(next.shortcut);
+      registerShortcuts(next);
     } catch (error) {
-      registerCaptureShortcut(previous.shortcut);
+      registerShortcuts(previous);
       throw error;
     }
   }
   try {
     await persistSettings(next);
   } catch (error) {
-    if (next.shortcut !== previous.shortcut) registerCaptureShortcut(previous.shortcut);
+    if (shortcutsChanged) registerShortcuts(previous);
     throw error;
   }
   settings = next;
@@ -523,6 +801,65 @@ ipcMain.on("restore-capture", restoreCapture);
 ipcMain.handle("capture-sources", captureSources);
 ipcMain.handle("save-capture", saveCapture);
 ipcMain.handle("copy-text", copyCaptureText);
+ipcMain.handle("pin-capture", pinCapture);
+ipcMain.handle(
+  "pin-image",
+  forPin((_pin, state) => ({ dataUrl: state.image.toDataURL() })),
+);
+ipcMain.on(
+  "pin-close",
+  forPin((pin) => pin.close()),
+);
+ipcMain.on(
+  "pin-copy",
+  forPin((pin, state) => copyPin(pin, state).catch(showError)),
+);
+ipcMain.on(
+  "pin-save",
+  forPin((pin, state) => savePin(pin, state).catch(showError)),
+);
+ipcMain.on(
+  "pin-save-as",
+  forPin((pin, state) => savePinAs(pin, state).catch(showError)),
+);
+ipcMain.on(
+  "pin-menu",
+  forPin((pin, state) => showPinMenu(pin, state)),
+);
+ipcMain.on(
+  "pin-zoom",
+  forPin((pin, state, payload) =>
+    zoomPin(pin, state, nextScale(state.scale, payload?.deltaY, state.baseSize), payload),
+  ),
+);
+ipcMain.on(
+  "pin-reset-zoom",
+  forPin((pin, state) => zoomPin(pin, state, 1)),
+);
+ipcMain.on(
+  "pin-opacity",
+  forPin((pin, state, deltaY) => setPinOpacity(pin, state, nextOpacity(state.opacity, deltaY))),
+);
+ipcMain.on(
+  "pin-drag-start",
+  forPin((_pin, state, pointer) => {
+    if (!Number.isFinite(pointer?.x) || !Number.isFinite(pointer?.y)) return;
+    state.drag = { bounds: state.bounds, pointer: { x: pointer.x, y: pointer.y } };
+  }),
+);
+ipcMain.on(
+  "pin-drag-move",
+  forPin((pin, state, pointer) => {
+    if (!state.drag) return;
+    setPinBounds(pin, state, dragBounds(state.drag.bounds, state.drag.pointer, pointer));
+  }),
+);
+ipcMain.on(
+  "pin-drag-end",
+  forPin((_pin, state) => {
+    state.drag = null;
+  }),
+);
 ipcMain.handle("get-settings", () => ({ ...settings, packaged: app.isPackaged }));
 ipcMain.handle("choose-output-directory", async () => {
   const result = await dialog.showOpenDialog(settingsWindow || undefined, {
@@ -533,6 +870,51 @@ ipcMain.handle("choose-output-directory", async () => {
   return result.canceled ? null : result.filePaths[0];
 });
 ipcMain.handle("save-settings", saveSettings);
+
+// At startup a shortcut another app already holds is dropped instead of leaving Region Snap without
+// one: first the pin shortcut, then the capture shortcut goes back to the default.
+async function recoverShortcuts(error) {
+  const candidates = [
+    { shortcut: settings.shortcut, pinShortcut: "" },
+    { shortcut: DEFAULT_SETTINGS.shortcut, pinShortcut: settings.pinShortcut },
+    { shortcut: DEFAULT_SETTINGS.shortcut, pinShortcut: "" },
+  ].filter(
+    (candidate) =>
+      !candidate.pinShortcut || !sameAccelerator(candidate.shortcut, candidate.pinShortcut),
+  );
+  let fallbackError = error;
+  const recovered = candidates.find((candidate) => {
+    try {
+      registerShortcuts(candidate);
+      return true;
+    } catch (candidateError) {
+      fallbackError = candidateError;
+      return false;
+    }
+  });
+  if (!recovered) {
+    showError(
+      new Error(`${error.message} Phím tắt mặc định cũng không khả dụng: ${fallbackError.message}`),
+    );
+    return;
+  }
+  const message =
+    recovered.shortcut === settings.shortcut
+      ? `${error.message} ${mainCopy("pinShortcutDisabled")}`
+      : `${error.message} Đã chuyển về phím tắt mặc định ${DEFAULT_SETTINGS.shortcut}.`;
+  settings = { ...settings, ...recovered };
+  createTrayMenu();
+  try {
+    await persistSettings();
+    showError(new Error(message));
+  } catch (persistError) {
+    showError(
+      new Error(
+        `${error.message} Đang dùng ${recovered.shortcut}, nhưng không thể lưu cấu hình: ${persistError.message}`,
+      ),
+    );
+  }
+}
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -548,33 +930,9 @@ if (!app.requestSingleInstanceLock()) {
     createTray();
     applyLoginSetting();
     try {
-      registerCaptureShortcut();
+      registerShortcuts();
     } catch (error) {
-      settings.shortcut = DEFAULT_SETTINGS.shortcut;
-      try {
-        registerCaptureShortcut(DEFAULT_SETTINGS.shortcut);
-      } catch (fallbackError) {
-        showError(
-          new Error(
-            `${error.message} Phím tắt mặc định cũng không khả dụng: ${fallbackError.message}`,
-          ),
-        );
-        return;
-      }
-      try {
-        await persistSettings();
-        showError(
-          new Error(
-            `${error.message} Đã chuyển về phím tắt mặc định ${DEFAULT_SETTINGS.shortcut}.`,
-          ),
-        );
-      } catch (persistError) {
-        showError(
-          new Error(
-            `${error.message} Đang dùng ${DEFAULT_SETTINGS.shortcut}, nhưng không thể lưu cấu hình: ${persistError.message}`,
-          ),
-        );
-      }
+      await recoverShortcuts(error);
     }
   });
 }
@@ -586,6 +944,7 @@ app.on("before-quit", () => {
   quitting = true;
   globalShortcut.unregisterAll();
   closeOverlays();
+  closePins();
 });
 app.on("activate", () => {
   if (!quitting) openSettingsWindow();

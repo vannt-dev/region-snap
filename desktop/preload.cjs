@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld("regionSnapDesktop", {
   cancel: () => ipcRenderer.send("cancel-capture"),
   captureSources: (selection) => ipcRenderer.invoke("capture-sources", selection),
   copyText: (dataUrl) => ipcRenderer.invoke("copy-text", dataUrl),
+  pin: (dataUrl) => ipcRenderer.invoke("pin-capture", dataUrl),
   onCaptureReady: (callback) => {
     ipcRenderer.once("capture-ready", (_event, payload) => callback(payload));
   },

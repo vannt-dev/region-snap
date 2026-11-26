@@ -6,10 +6,10 @@ const vm = require("node:vm");
 
 const root = path.resolve(__dirname, "..");
 const source = fs.readFileSync(path.join(root, "desktop/i18n.js"), "utf8");
-const pages = ["desktop/settings.html", "desktop/overlay.html"].map((file) =>
+const pages = ["desktop/settings.html", "desktop/overlay.html", "desktop/pin.html"].map((file) =>
   fs.readFileSync(path.join(root, file), "utf8"),
 );
-const scripts = ["desktop/settings.js", "desktop/overlay.js"].map((file) =>
+const scripts = ["desktop/settings.js", "desktop/overlay.js", "desktop/pin.js"].map((file) =>
   fs.readFileSync(path.join(root, file), "utf8"),
 );
 

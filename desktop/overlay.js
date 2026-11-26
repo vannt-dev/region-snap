@@ -8,10 +8,11 @@
   const moveButton = document.getElementById("move");
   const captureButton = document.getElementById("capture");
   const copyTextButton = document.getElementById("copy-text");
+  const pinButton = document.getElementById("pin");
   const cancelButton = document.getElementById("cancel");
   const status = document.getElementById("status");
   const MIN_SIZE = 8;
-  const TOOLBAR_WIDTH = 370;
+  const TOOLBAR_WIDTH = 440;
   const TOOLBAR_HEIGHT = 42;
 
   let rect = null;
@@ -212,6 +213,19 @@
     }
   }
 
+  async function pinSelection() {
+    if (!canCapture()) return;
+    selector.dataset.state = "saving";
+    showStatus(translate("pinning"));
+    try {
+      await api.pin(await captureSelection());
+    } catch (error) {
+      api.restore();
+      selector.dataset.state = "ready";
+      showStatus(error?.message || translate("pinFailed"));
+    }
+  }
+
   selector.addEventListener("mousedown", onPointerDown);
   window.addEventListener("mousemove", onPointerMove);
   window.addEventListener("mouseup", onPointerUp);
@@ -227,13 +241,14 @@
   }
   captureButton.addEventListener("click", saveSelection);
   copyTextButton.addEventListener("click", copySelectionText);
+  pinButton.addEventListener("click", pinSelection);
   cancelButton.addEventListener("click", api.cancel);
   window.addEventListener("keydown", (event) => {
     if (event.key === "Escape") api.cancel();
     if (event.key === "Enter") saveSelection();
-    if (event.key.toLowerCase() === "t" && !event.ctrlKey && !event.altKey && !event.metaKey) {
-      copySelectionText();
-    }
+    const plainKey = !event.ctrlKey && !event.altKey && !event.metaKey;
+    if (event.key.toLowerCase() === "t" && plainKey) copySelectionText();
+    if (event.key.toLowerCase() === "p" && plainKey) pinSelection();
   });
   window.addEventListener("resize", () => {
     if (rect) rect = Geometry.fitRectToBounds(rect, bounds());
@@ -242,5 +257,6 @@
 
   api.onCaptureReady(() => {
     ready = true;
+    selector.dataset.ready = "true";
   });
 })();
